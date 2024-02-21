@@ -9,7 +9,6 @@ use CodeDistortion\Backoff\Jitter\RangeJitter;
 use CodeDistortion\Backoff\Settings;
 use CodeDistortion\Backoff\Strategies\FixedBackoffAlgorithm;
 use CodeDistortion\Backoff\Strategies\LinearBackoffAlgorithm;
-use CodeDistortion\Backoff\Support\BackoffStrategyInterface;
 use CodeDistortion\Backoff\Tests\PHPUnitTestCase;
 
 /**
@@ -17,7 +16,7 @@ use CodeDistortion\Backoff\Tests\PHPUnitTestCase;
  *
  * @phpcs:disable PSR1.Methods.CamelCapsMethodName.NotCamelCaps
  */
-class BackoffHandlerUnitTest extends PHPUnitTestCase
+class BackoffStrategyUnitTest extends PHPUnitTestCase
 {
     /**
      * Test Backoff's alternative constructors.

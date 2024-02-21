@@ -8,7 +8,7 @@ namespace CodeDistortion\Backoff\Exceptions;
 class BackoffInitialisationException extends BackoffException
 {
     /**
-     * RandomBackoffStrategy was given a min value that was greater than the max value.
+     * A min value was given that was greater than the max value.
      *
      * @param integer|float $minDelay The min value given.
      * @param integer|float $maxDelay The max value given.
@@ -16,7 +16,7 @@ class BackoffInitialisationException extends BackoffException
      */
     public static function randMinIsGreaterThanMax(int|float $minDelay, int|float $maxDelay): self
     {
-        return new self("The RandomBackoffStrategy's min value ($minDelay) is greater than the max value ($maxDelay)");
+        return new self("A min value ($minDelay) was given that is greater than the max value ($maxDelay)");
     }
 
     /**

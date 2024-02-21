@@ -27,11 +27,11 @@ use CodeDistortion\Backoff\Support\JitterInterface;
 /**
  * Class that implements a backoff strategy.
  *
- * This class adds methods to assist with instantiation and configuration of the backoff strategy.
+ * The parent class is Support/BaseBackoffStrategy implements the main logic.
  *
- * The parent class is Support/AbstractBackoffHandler implements the backoff strategy logic.
+ * This class adds methods to assist with instantiation and configuration.
  */
-class Backoff extends BaseBackoffStrategy implements BackoffStrategyInterface
+class BackoffStrategy extends BaseBackoffStrategy implements BackoffStrategyInterface
 {
     // instantiation methods
 
@@ -41,28 +41,28 @@ class Backoff extends BaseBackoffStrategy implements BackoffStrategyInterface
      * @param BackoffAlgorithmInterface $backoffAlgorithm       The backoff algorithm to use.
      * @param JitterInterface|null      $jitter                 The jitter to apply (default: no jitter).
      * @param integer|null              $maxAttempts            The maximum number of attempts to allow - null for
-     *                                                         infinite (default: null).
+     *                                                          infinite (default: null).
      * @param integer|float|null        $maxDelay               The maximum delay to allow (optional).
      * @param string|null               $unitType               The unit type to use
-     *                                                         (from Settings::UNIT_XXX, default: seconds).
-     * @param boolean                   $runsBeforeFirstAttempt Whether the backoff handler should start with the first
-     *                                                         attempt, meaning no initial delay.
+     *                                                          (from Settings::UNIT_XXX, default: seconds).
+     * @param boolean                   $runsBeforeFirstAttempt Whether the backoff strategy should start with the first
+     *                                                          attempt, meaning no initial delay.
      * @param boolean                   $immediateFirstRetry    Whether to insert a 0 delay as the first retry delay.
      * @param boolean                   $delaysEnabled          Whether delays are allowed or not.
-     * @param boolean                  $retriesEnabled         Whether retries are allowed or not.
+     * @param boolean                   $retriesEnabled         Whether retries are allowed or not.
      * @return self
      * @throws BackoffInitialisationException When an invalid $unitType is specified.
      */
     public static function new(
         BackoffAlgorithmInterface $backoffAlgorithm,
-        ?JitterInterface          $jitter = null,
-        ?int                      $maxAttempts = null,
-        int|float|null            $maxDelay = null,
-        ?string                   $unitType = Settings::UNIT_SECONDS,
-        bool                      $runsBeforeFirstAttempt = false,
-        bool                      $immediateFirstRetry = false,
-        bool                      $delaysEnabled = true,
-        bool                      $retriesEnabled = true,
+        ?JitterInterface $jitter = null,
+        ?int $maxAttempts = null,
+        int|float|null $maxDelay = null,
+        ?string $unitType = Settings::UNIT_SECONDS,
+        bool $runsBeforeFirstAttempt = false,
+        bool $immediateFirstRetry = false,
+        bool $delaysEnabled = true,
+        bool $retriesEnabled = true,
     ): self {
 
         return new self(
@@ -85,7 +85,7 @@ class Backoff extends BaseBackoffStrategy implements BackoffStrategyInterface
     // instantiation methods - for each backoff algorithm
 
     /**
-     * Create a new backoff handler using the fixed backoff algorithm.
+     * Create a new backoff strategy using the fixed backoff algorithm.
      *
      * @param integer|float $delay The delay to use.
      * @return self
@@ -98,7 +98,7 @@ class Backoff extends BaseBackoffStrategy implements BackoffStrategyInterface
     }
 
     /**
-     * Create a new backoff handler using the linear backoff algorithm.
+     * Create a new backoff strategy using the linear backoff algorithm.
      *
      * @param integer|float      $initialDelay  The initial delay to use.
      * @param integer|float|null $delayIncrease The amount to increase the delay by (optional, falls back to
@@ -116,7 +116,7 @@ class Backoff extends BaseBackoffStrategy implements BackoffStrategyInterface
     }
 
     /**
-     * Create a new backoff handler using the exponential backoff algorithm.
+     * Create a new backoff strategy using the exponential backoff algorithm.
      *
      * @param integer|float $initialDelay The initial delay to use.
      * @param integer|float $factor       The factor to multiply by each time (default 2).
@@ -133,7 +133,7 @@ class Backoff extends BaseBackoffStrategy implements BackoffStrategyInterface
     }
 
     /**
-     * Create a new backoff handler using the polynomial backoff algorithm.
+     * Create a new backoff strategy using the polynomial backoff algorithm.
      *
      * @param integer|float $initialDelay The initial delay to use.
      * @param integer|float $power        The power to raise the retry number to (default 2).
@@ -150,7 +150,7 @@ class Backoff extends BaseBackoffStrategy implements BackoffStrategyInterface
     }
 
     /**
-     * Create a new backoff handler using the fibonacci backoff algorithm.
+     * Create a new backoff strategy using the fibonacci backoff algorithm.
      *
      * @param integer|float $initialDelay The initial delay to use.
      * @param boolean       $includeFirst Whether to include the first value in the Fibonacci sequence or not.
@@ -167,7 +167,7 @@ class Backoff extends BaseBackoffStrategy implements BackoffStrategyInterface
     }
 
     /**
-     * Create a new backoff handler using the decorrelated backoff algorithm.
+     * Create a new backoff strategy using the decorrelated backoff algorithm.
      *
      * @param integer|float $baseDelay  The base delay to use.
      * @param integer|float $multiplier The amount to multiply the previous delay by (default 3).
@@ -184,7 +184,7 @@ class Backoff extends BaseBackoffStrategy implements BackoffStrategyInterface
     }
 
     /**
-     * Create a new backoff handler using the random backoff algorithm.
+     * Create a new backoff strategy using the random backoff algorithm.
      *
      * @param integer|float $minDelay The minimum delay to use.
      * @param integer|float $maxDelay The maximum delay to use.
@@ -202,7 +202,7 @@ class Backoff extends BaseBackoffStrategy implements BackoffStrategyInterface
     }
 
     /**
-     * Create a new backoff handler using the sequence backoff algorithm.
+     * Create a new backoff strategy using the sequence backoff algorithm.
      *
      * @param array<integer|float> $delays The sequence of delays to use.
      * @return self
@@ -215,7 +215,7 @@ class Backoff extends BaseBackoffStrategy implements BackoffStrategyInterface
     }
 
     /**
-     * Create a new backoff handler using the callback backoff algorithm.
+     * Create a new backoff strategy using the callback backoff algorithm.
      *
      * @param callable $callback The callback that will determine the delays to use.
      * @return self
@@ -228,7 +228,7 @@ class Backoff extends BaseBackoffStrategy implements BackoffStrategyInterface
     }
 
     /**
-     * Create a new backoff handler using a custom backoff algorithm.
+     * Create a new backoff strategy using a custom backoff algorithm.
      *
      * @param BackoffAlgorithmInterface $backoffAlgorithm The backoff algorithm instance to use.
      * @return self
@@ -239,7 +239,7 @@ class Backoff extends BaseBackoffStrategy implements BackoffStrategyInterface
     }
 
     /**
-     * Create a new backoff handler using the "noop" backoff algorithm.
+     * Create a new backoff strategy using the "noop" backoff algorithm.
      *
      * @return self
      */
@@ -251,7 +251,7 @@ class Backoff extends BaseBackoffStrategy implements BackoffStrategyInterface
     }
 
     /**
-     * Create a new backoff handler using the "no backoff" algorithm.
+     * Create a new backoff strategy using the "no backoff" algorithm.
      *
      * @return self
      */
@@ -543,7 +543,8 @@ class Backoff extends BaseBackoffStrategy implements BackoffStrategyInterface
     /**
      * Start the sequence with the first ATTEMPT, meaning no delay is applied the first iteration.
      *
-     * @param boolean $before Whether the backoff handler should start with the first attempt, meaning no initial delay.
+     * @param boolean $before Whether the backoff strategy should start with the first attempt, meaning no initial
+     *                        delay.
      * @return $this
      * @throws BackoffRuntimeException When the backoff process has already started.
      */

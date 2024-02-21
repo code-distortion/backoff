@@ -105,4 +105,29 @@ abstract class Support
         // convert difference in microseconds to seconds and add to total seconds difference
         return $diffInSeconds + ($diffInUs / 1000000);
     }
+
+    /**
+     * Take the parameters and return them as an array.
+     *
+     * todo - test this method
+     *
+     * @param mixed[] $parameters       The parameters to normalise.
+     * @param boolean $checkForCallable When detecting arrays to flatten, whether to check for an array that's callable.
+     * @return array
+     */
+    public static function normaliseParameters(array $parameters, bool $checkForCallable = false): array
+    {
+        $returnArgs = [];
+        foreach ($parameters as $parameter) {
+
+            $isArray = is_array($parameter) && (!$checkForCallable || !is_callable($parameter));
+
+            $returnArgs = array_merge(
+                $returnArgs,
+                $isArray ? $parameter : [$parameter]
+            );
+        }
+
+        return $returnArgs;
+    }
 }

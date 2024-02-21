@@ -3,11 +3,11 @@
 namespace CodeDistortion\Backoff\Support;
 
 /**
- * Abstract class for classes that provide a backoff strategy.
+ * Abstract class for classes that provide a backoff algorithm.
  */
-abstract class BaseBackoffStrategy implements BackoffStrategyInterface
+abstract class BaseBackoffAlgorithm implements BackoffAlgorithmInterface
 {
-    /** @var boolean Whether jitter may be applied to the delays calculated by this strategy. */
+    /** @var boolean Whether jitter may be applied to the delays calculated by this algorithm. */
     public bool $jitterMayBeApplied = true;
 
 
@@ -27,14 +27,14 @@ abstract class BaseBackoffStrategy implements BackoffStrategyInterface
         /** @infection-ignore-all $count-- */
         $prevDelay = null;
         for ($count = 1; $count <= $maxSteps; $count++) {
-            $delays[] = $prevDelay = $this->calculateBackoffDelay($count, $prevDelay);
+            $delays[] = $prevDelay = $this->calculateBaseDelay($count, $prevDelay);
         }
 
         return $delays;
     }
 
     /**
-     * Check if jitter may be applied to the delays produced by this strategy.
+     * Check if jitter may be applied to the delays produced by this algorithm.
      *
      * @return boolean
      */

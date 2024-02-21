@@ -54,7 +54,7 @@ class AttemptLog
     /**
      * Get the number attempts that could be made (null for infinite).
      *
-     * Note: A BackoffStrategy can return false to end the attempts early. This won't be reflected here.
+     * Note: A BackoffAlgorithm can return false to end the attempts early. This won't be reflected here.
      *
      * @return integer|null
      */

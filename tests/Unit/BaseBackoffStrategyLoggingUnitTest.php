@@ -10,14 +10,14 @@ use CodeDistortion\Backoff\Tests\PHPUnitTestCase;
 use DateTime;
 
 /**
- * Test how the AbstractBackoffHandler logs the attempts.
+ * Test how the BaseBackoffStrategy logs the attempts.
  *
  * @phpcs:disable PSR1.Methods.CamelCapsMethodName.NotCamelCaps
  */
-class BaseBackoffHandlerLoggingUnitTest extends PHPUnitTestCase
+class BaseBackoffStrategyLoggingUnitTest extends PHPUnitTestCase
 {
     /**
-     * Test that the AbstractBackoffHandler generates AttemptLog log objects properly.
+     * Test that the BaseBackoffStrategy generates AttemptLog log objects properly.
      *
      * @test
      * @dataProvider logGeneratorDataProvider
@@ -241,7 +241,7 @@ class BaseBackoffHandlerLoggingUnitTest extends PHPUnitTestCase
     }
 
     /**
-     * Test that the AbstractBackoffHandler can be reset.
+     * Test that the BaseBackoffStrategy can be reset.
      *
      * @return void
      */
@@ -265,7 +265,7 @@ class BaseBackoffHandlerLoggingUnitTest extends PHPUnitTestCase
     }
 
     /**
-     * Test that the AbstractBackoffHandler populates the correct unit type.
+     * Test that the BaseBackoffStrategy populates the correct unit type.
      *
      * @return void
      */

@@ -2,13 +2,14 @@
 
 namespace CodeDistortion\Backoff\Support;
 
+use CodeDistortion\Backoff\AttemptLog;
 use CodeDistortion\Backoff\Exceptions\BackoffInitialisationException;
 use CodeDistortion\Backoff\Settings;
 
 /**
- * Interface for the backoff handler class.
+ * Interface for the backoff strategy class.
  */
-interface BackoffHandlerInterface
+interface BackoffStrategyInterface
 {
     /**
      * Constructor
@@ -20,12 +21,12 @@ interface BackoffHandlerInterface
      * @param integer|float|null        $maxDelay               The maximum delay to allow (optional).
      * @param string|null               $unitType               The unit type to use
      *                                                          (from Settings::UNIT_XXX, default: seconds).
-     * @param boolean                   $runsBeforeFirstAttempt Whether the backoff handler should start with the first
+     * @param boolean                   $runsBeforeFirstAttempt Whether the backoff strategy should start with the first
      *                                                          attempt, meaning no initial delay.
      * @param boolean                   $immediateFirstRetry    Whether to insert a 0 delay as the first retry delay.
      * @param boolean                   $delaysEnabled          Whether delays are allowed or not.
      * @param boolean                   $retriesEnabled         Whether retries are allowed or not.
-     * @throws BackoffInitialisationException When an invalid $unitType is specified.
+     * @throws BackoffInitialisationException When $unitType is invalid.
      */
     public function __construct(
         BackoffAlgorithmInterface $backoffAlgorithm,
@@ -42,11 +43,26 @@ interface BackoffHandlerInterface
 
 
     /**
+     * Reset the backoff strategy to its initial state.
+     *
+     * @return $this
+     */
+    public function reset(): self;
+
+
+
+
+
+    /**
      * Run a step of the backoff process.
      *
      * @return boolean
      */
     public function step(): bool;
+
+
+
+
 
     /**
      * Calculate the delay needed before retrying an action next.
@@ -55,12 +71,16 @@ interface BackoffHandlerInterface
      */
     public function performBackoffLogic(): bool;
 
+
+
+
+
     /**
-     * Check if the backoff handler should stop.
+     * Check if the backoff strategy should stop.
      *
      * @return boolean
      */
-    public function shouldStop(): bool;
+    public function hasStopped(): bool;
 
     /**
      * Sleep for the calculated period.
@@ -68,6 +88,22 @@ interface BackoffHandlerInterface
      * @return boolean
      */
     public function sleep(): bool;
+
+
+
+    /**
+     * Retrieve the latest AttemptLog, representing the most current attempt.
+     *
+     * @return AttemptLog|null
+     */
+    public function latestLog(): ?AttemptLog;
+
+    /**
+     * Retrieve all of the AttemptLog logs.
+     *
+     * @return AttemptLog[]
+     */
+    public function logs(): array;
 
 
 
@@ -79,6 +115,8 @@ interface BackoffHandlerInterface
      * @return integer
      */
     public function getAttemptNumber(): int;
+
+
 
     /**
      * Get the most recently calculated delay.

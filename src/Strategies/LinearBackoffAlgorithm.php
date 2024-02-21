@@ -2,15 +2,15 @@
 
 namespace CodeDistortion\Backoff\Strategies;
 
-use CodeDistortion\Backoff\Support\BaseBackoffStrategy;
-use CodeDistortion\Backoff\Support\BackoffStrategyInterface;
+use CodeDistortion\Backoff\Support\BaseBackoffAlgorithm;
+use CodeDistortion\Backoff\Support\BackoffAlgorithmInterface;
 
 /**
- * A class that provides a linear backoff strategy.
+ * A class that provides a linear backoff algorithm.
  */
-class LinearBackoffStrategy extends BaseBackoffStrategy implements BackoffStrategyInterface
+class LinearBackoffAlgorithm extends BaseBackoffAlgorithm implements BackoffAlgorithmInterface
 {
-    /** @var boolean Whether jitter may be applied to the delays calculated by this strategy. */
+    /** @var boolean Whether jitter may be applied to the delays calculated by this algorithm. */
     public bool $jitterMayBeApplied = true;
 
 
@@ -34,13 +34,13 @@ class LinearBackoffStrategy extends BaseBackoffStrategy implements BackoffStrate
      * $retryNumber starts at 1 and increases for each subsequent retry.
      *
      * Note: This is intended to run in a stateless way, only using $retryNumber
-     * and possibly $prevDelay to work out the delay.
+     * and possibly $prevDelay to work out the next delay.
      *
      * @param integer            $retryNumber The retry being attempted.
      * @param integer|float|null $prevDelay   The previous delay used (if any).
      * @return integer|float|null
      */
-    public function calculateBackoffDelay(int $retryNumber, int|float|null $prevDelay): int|float|null
+    public function calculateBaseDelay(int $retryNumber, int|float|null $prevDelay): int|float|null
     {
         $delayIncrease = $this->delayIncrease ?? $this->initialDelay;
 

@@ -10,7 +10,7 @@ use DateTime;
 /**
  * Class that implements the backoff strategy logic.
  */
-abstract class BaseBackoffHandler implements BackoffHandlerInterface
+abstract class BaseBackoffStrategy implements BackoffStrategyInterface
 {
     // settings - the rest are in the constructor
 
@@ -21,7 +21,7 @@ abstract class BaseBackoffHandler implements BackoffHandlerInterface
 
     // working variables
 
-    /** @var boolean Whether the backoff handler should stop. */
+    /** @var boolean Whether the backoff strategy should stop. */
     private bool $stopped;
 
     /** @var integer|null The retry attempt count. */
@@ -88,7 +88,7 @@ abstract class BaseBackoffHandler implements BackoffHandlerInterface
      * @param integer|float|null        $maxDelay               The maximum delay to allow (optional).
      * @param string|null               $unitType               The unit type to use
      *                                                          (from Settings::UNIT_XXX, default: seconds).
-     * @param boolean                   $runsBeforeFirstAttempt Whether the backoff handler should start with the first
+     * @param boolean                   $runsBeforeFirstAttempt Whether the backoff strategy should start with the first
      *                                                          attempt, meaning no initial delay.
      * @param boolean                   $immediateFirstRetry    Whether to insert a 0 delay as the first retry delay.
      * @param boolean                   $delaysEnabled          Whether delays are allowed or not.
@@ -118,7 +118,7 @@ abstract class BaseBackoffHandler implements BackoffHandlerInterface
 
 
     /**
-     * Reset the backoff handler to its initial state.
+     * Reset the backoff strategy to its initial state.
      *
      * @return $this
      */
@@ -151,7 +151,7 @@ abstract class BaseBackoffHandler implements BackoffHandlerInterface
     }
 
     /**
-     * Reassess if the backoff handler should be stopped because of the max attempts.
+     * Reassess if the backoff strategy should be stopped because of the max attempts.
      *
      * @return void
      */
@@ -354,7 +354,7 @@ abstract class BaseBackoffHandler implements BackoffHandlerInterface
 
 
     /**
-     * Check if the backoff handler has started yet.
+     * Check if the backoff strategy has started yet.
      *
      * @return boolean
      */
@@ -364,11 +364,25 @@ abstract class BaseBackoffHandler implements BackoffHandlerInterface
     }
 
     /**
-     * Check if the backoff handler should stop.
+     * Find out if the backoff strategy is currently on the last step.
+     *
+     * todo - test this method
      *
      * @return boolean
      */
-    public function shouldStop(): bool
+    public function isLastAttempt(): bool
+    {
+        return $this->getAttemptNumber() >= $this->maxAttempts;
+    }
+
+    /**
+     * Check if the backoff strategy should stop.
+     *
+     * todo - test the addition of isLastAttempt()
+     *
+     * @return boolean
+     */
+    public function hasStopped(): bool
     {
         return $this->stopped;
     }

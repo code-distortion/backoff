@@ -2,15 +2,15 @@
 
 namespace CodeDistortion\Backoff\Tests\Unit\Support;
 
-use CodeDistortion\Backoff\Support\BaseBackoffStrategy;
-use CodeDistortion\Backoff\Support\BackoffStrategyInterface;
+use CodeDistortion\Backoff\Support\BaseBackoffAlgorithm;
+use CodeDistortion\Backoff\Support\BackoffAlgorithmInterface;
 
 /**
- * A class that provides a fixed backoff strategy.
+ * A class that provides a fixed backoff algorithm.
  */
-class FixedBackoffWithNoJitterStrategy extends BaseBackoffStrategy implements BackoffStrategyInterface
+class FixedBackoffWithNoJitterAlgorithm extends BaseBackoffAlgorithm implements BackoffAlgorithmInterface
 {
-    /** @var boolean Whether jitter may be applied to the delays calculated by this strategy. */
+    /** @var boolean Whether jitter may be applied to the delays calculated by this algorithm. */
     public bool $jitterMayBeApplied = false;
 
 
@@ -37,7 +37,7 @@ class FixedBackoffWithNoJitterStrategy extends BaseBackoffStrategy implements Ba
      * @param integer|float|null $prevDelay   The previous delay used (if any).
      * @return integer|float|null
      */
-    public function calculateBackoffDelay(int $retryNumber, int|float|null $prevDelay): int|float|null
+    public function calculateBaseDelay(int $retryNumber, int|float|null $prevDelay): int|float|null
     {
         return $this->delay;
     }

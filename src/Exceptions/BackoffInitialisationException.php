@@ -1,0 +1,32 @@
+<?php
+
+namespace CodeDistortion\Backoff\Exceptions;
+
+/**
+ * The base Backoff exception class.
+ */
+class BackoffInitialisationException extends BackoffException
+{
+    /**
+     * RandomBackoffStrategy was given a min value that was greater than the max value.
+     *
+     * @param integer|float $minDelay The min value given.
+     * @param integer|float $maxDelay The max value given.
+     * @return self
+     */
+    public static function randMinIsGreaterThanMax(int|float $minDelay, int|float $maxDelay): self
+    {
+        return new self("The RandomBackoffStrategy's min value ($minDelay) is greater than the max value ($maxDelay)");
+    }
+
+    /**
+     * When an invalid unit type was given.
+     *
+     * @param string $unitType The invalid unit type given.
+     * @return self
+     */
+    public static function invalidUnitType(string $unitType): self
+    {
+        return new self("Invalid unit type \"$unitType\" was given");
+    }
+}

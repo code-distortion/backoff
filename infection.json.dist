@@ -1,0 +1,22 @@
+{
+  "$schema": "vendor/infection/infection/resources/schema.json",
+  "source": {
+    "directories": [
+      "src"
+    ],
+//    "excludes": [
+//      "src/ServiceProvider.php"
+//    ]
+  },
+  "timeout": 300,
+  "logs": {
+    "text": "infection/infection.log",
+    "html": "infection/infection.html",
+    "summary": "infection/summary.log",
+    "json": "infection/infection-log.json",
+    "perMutator": "infection/per-mutator.md",
+  },
+  "mutators": {
+    "@default": true
+  }
+}

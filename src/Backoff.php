@@ -4,7 +4,6 @@ namespace CodeDistortion\Backoff;
 
 use Closure;
 use CodeDistortion\Backoff\Exceptions\BackoffRuntimeException;
-use CodeDistortion\Backoff\Support\BackoffStrategyInterface;
 use CodeDistortion\Backoff\Support\Support;
 use ReflectionFunction;
 use ReflectionIntersectionType;
@@ -17,10 +16,10 @@ use Throwable;
 /**
  * A class that takes a BackoffStrategy and runs the backoff process through to completion.
  */
-class Backoff
+class Backoff extends BackoffStrategy
 {
-    /** @var array<class-string|callable>|null The class-string exceptions to retry, or callback to use to get the result. */
-    private ?array $retryExceptions = null;
+    /** @var array<class-string|callable>|false The class-string exceptions to retry, or callback to use to get the result. */
+    private array|false $retryExceptions = [];
 
     /** @var callable[] The callbacks to call when an exception occurs. */
     private array $failedExceptionCallbacks = [];
@@ -35,51 +34,11 @@ class Backoff
 
 
 
-    // instantiation methods
-
-    /**
-     * Constructor
-     *
-     * @param BackoffStrategyInterface $strategy The backoff strategy to use.
-     */
-    public function __construct(
-        private BackoffStrategyInterface $strategy,
-    ) {
-    }
-
-    /**
-     * Alternate constructor
-     *
-     * @param BackoffStrategyInterface $strategy The backoff strategy to use.
-     * @return self
-     */
-    public static function new(BackoffStrategyInterface $strategy): self
-    {
-        return new self($strategy);
-    }
-
-
-
-
-
-    /**
-     * Create a new backoff with fixed backoff strategy.
-     *
-     * @param integer|float $delay The delay to use.
-     * @return self
-     */
-    public static function fixed(int|float $delay): self
-    {
-        return self::new(BackoffStrategy::fixed($delay));
-    }
-
-
-
-
-
     /**
      * Specify the exceptions to retry - one or more (or an array of) exception class-strings, or callbacks to call
      * when they occur to work out the answer.
+     *
+     * todo - test that passing no exceptions to this method resets this so that all exceptions are retried
      *
      * @param class-string|callable|array<class-string|callable> ...$exceptions The exceptions to retry.
      * @return $this
@@ -87,7 +46,41 @@ class Backoff
     public function retryExceptions(string|callable|array ...$exceptions): self
     {
         $exceptions = Support::normaliseParameters($exceptions, true);
-        $this->retryExceptions = array_merge($this->retryExceptions ??= [], $exceptions);
+
+        // specifying no exceptions means to catch all exceptions
+        // (this overrides previously set exceptions)
+        if ($exceptions == []) {
+            $this->retryExceptions = [];
+        } else {
+            if ($this->retryExceptions === false) {
+                $this->retryExceptions = [];
+            }
+            $this->retryExceptions = array_merge($this->retryExceptions ??= [], $exceptions);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Specify that exceptions should not be retried.
+     *
+     * @return $this
+     */
+    public function dontRetryExceptions(): self
+    {
+        $this->retryExceptions = false;
+
+        return $this;
+    }
+
+    /**
+     * Specify that exceptions should be rethrown instead of retried.
+     *
+     * @return $this
+     */
+    public function rethrowExceptions(): self
+    {
+        $this->retryExceptions = false;
 
         return $this;
     }
@@ -139,8 +132,8 @@ class Backoff
     /**
      * Specify that the result fails (and the action should be retried) when it matches the given value.
      *
-     * @param mixed  $value  The value to check for.
-     * @param boolen $strict Whether to use strict comparison (default false).
+     * @param mixed   $value  The value to check for.
+     * @param boolean $strict Whether to use strict comparison (default false).
      * @return $this
      */
     public function retryWhenResult(mixed $value, bool $strict = false): self
@@ -153,8 +146,8 @@ class Backoff
     /**
      * Specify that the result is successful (and retries should stop) when it matches the given value.
      *
-     * @param mixed  $value  The value to check for.
-     * @param boolen $strict Whether to use strict comparison (default false).
+     * @param mixed   $value  The value to check for.
+     * @param boolean $strict Whether to use strict comparison (default false).
      * @return $this
      */
     public function isSuccessfulWhen(mixed $value, bool $strict = false): self
@@ -190,9 +183,11 @@ class Backoff
      */
     public function attempt(callable $callback, mixed $default = null): mixed
     {
-        $this->strategy->reset()->runsBeforeFirstAttempt();
+        // $this->strategy->reset()
+        $this->reset()->runsBeforeFirstAttempt();
 
-        while ($this->strategy->step()) {
+        // $this->strategy->step()
+        while ($this->step()) {
             try {
 
                 return $callback();
@@ -201,7 +196,8 @@ class Backoff
 
                 $this->callExceptionCallbacks($e);
 
-                $stop = ($this->strategy->isLastAttempt()) || (!$this->exceptionIsRetryable($e));
+                // $this->strategy->isLastAttempt()
+                $stop = ($this->isLastAttempt()) || (!$this->exceptionIsRetryable($e));
                 if ($stop) {
                     if ($this->rethrowLastException) {
                         throw $e;
@@ -235,8 +231,8 @@ class Backoff
      */
     private function exceptionIsRetryable(Throwable $e): bool
     {
-        // the user hasn't specified to catch exceptions
-        if (is_null($this->retryExceptions)) {
+        // the user has specified to not catch exceptions
+        if ($this->retryExceptions === false) {
             return false;
         }
 
@@ -245,7 +241,7 @@ class Backoff
             return true;
         }
 
-        // the user specified which exceptions to catch, or callback/s to check with
+        // the user specified particular exceptions to catch, or callback/s to check with
         foreach ($this->retryExceptions as $retry) {
 
             if (is_string($retry)) {

@@ -1,28 +1,39 @@
 <?php
 
-namespace CodeDistortion\Backoff\Strategies;
+namespace CodeDistortion\Backoff\Algorithms;
 
+use CodeDistortion\Backoff\Exceptions\BackoffInitialisationException;
 use CodeDistortion\Backoff\Support\BaseBackoffAlgorithm;
 use CodeDistortion\Backoff\Support\BackoffAlgorithmInterface;
+use CodeDistortion\Backoff\Support\Support;
 
 /**
  * A class that provides a random backoff algorithm.
  */
-class SequenceBackoffAlgorithm extends BaseBackoffAlgorithm implements BackoffAlgorithmInterface
+class RandomBackoffAlgorithm extends BaseBackoffAlgorithm implements BackoffAlgorithmInterface
 {
     /** @var boolean Whether jitter may be applied to the delays calculated by this algorithm. */
-    public bool $jitterMayBeApplied = true;
+    public bool $jitterMayBeApplied = false;
 
 
 
     /**
      * Constructor
      *
-     * @param array<integer|float> $delays The sequence of delays to use.
+     * @param integer|float $minDelay The minimum delay to use.
+     * @param integer|float $maxDelay The maximum delay to use.
+     * @throws BackoffInitialisationException Thrown when the minDelay is greater than the maxDelay.
      */
     public function __construct(
-        private array $delays,
+        private int|float $minDelay,
+        private int|float $maxDelay,
     ) {
+        if ($minDelay > $maxDelay) {
+            throw BackoffInitialisationException::randMinIsGreaterThanMax($minDelay, $maxDelay);
+        }
+
+        $this->minDelay = max(0, $this->minDelay);
+        $this->maxDelay = max(0, $this->maxDelay);
     }
 
     /**
@@ -39,6 +50,9 @@ class SequenceBackoffAlgorithm extends BaseBackoffAlgorithm implements BackoffAl
      */
     public function calculateBaseDelay(int $retryNumber, int|float|null $prevDelay): int|float|null
     {
-        return $this->delays[$retryNumber - 1] ?? null;
+        return Support::randFloat(
+            $this->minDelay,
+            $this->maxDelay
+        );
     }
 }

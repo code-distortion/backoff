@@ -65,8 +65,9 @@ class BackoffUnitTest extends PHPUnitTestCase
         };
 
         // set up the backoff
-        $strategy = BackoffStrategy::noop()->maxAttempts(5);
-        $backoff = Backoff::new($strategy);
+        $backoff = Backoff::noop()->maxAttempts(5);
+
+        $backoff->dontRetryExceptions();
 
         if (is_array($retryExceptions1)) {
             $backoff->retryExceptions(...$retryExceptions1);
@@ -106,7 +107,7 @@ class BackoffUnitTest extends PHPUnitTestCase
     {
         $randInt = mt_rand();
         $throwUntilAttempt = function ($throwUntil, $return, $throw) {
-            return function () use (&$throwUntil, $return, $throw): int {
+            return function () use (&$throwUntil, $return, $throw): mixed {
                 return --$throwUntil <= 0
                     ? $return
                     : throw $throw;
@@ -463,8 +464,7 @@ class BackoffUnitTest extends PHPUnitTestCase
     ): void {
 
         // set up the backoff
-        $strategy = BackoffStrategy::noop()->maxAttempts(5);
-        $backoff = Backoff::new($strategy);
+        $backoff = Backoff::noop()->maxAttempts(5);
 
         if (!is_null($rethrowLastException)) {
             $backoff->rethrowLastException($rethrowLastException);
@@ -593,8 +593,7 @@ class BackoffUnitTest extends PHPUnitTestCase
         mixed $expectedReturn,
     ): void {
 
-        $strategy = BackoffStrategy::noop()->maxAttempts(5);
-        $backoff = Backoff::new($strategy)->rethrowLastException(false);
+        $backoff = Backoff::noop()->maxAttempts(5)->rethrowLastException(false);
 
         $return = !is_null($default)
             ? $backoff->attempt($attempt, $default)
@@ -618,7 +617,7 @@ class BackoffUnitTest extends PHPUnitTestCase
         $randStdClass = new stdClass();
         $randStdClass->abc = mt_rand();
         $throwUntilAttempt = function ($throwUntil, $return, $throw) {
-            return function () use (&$throwUntil, $return, $throw): int {
+            return function () use (&$throwUntil, $return, $throw): mixed {
                 return --$throwUntil <= 0
                     ? $return
                     : throw $throw;
@@ -639,7 +638,7 @@ class BackoffUnitTest extends PHPUnitTestCase
                 'expectedReturn' => $randBool,
             ],
             'throw until attempt 3 - default bool' => [
-                'attempt' => $throwUntilAttempt(3, $randInt, $backoffException),
+                'attempt' => $throwUntilAttempt(3, $randBool, $backoffException),
                 'default' => $randBool,
                 'expectedReturn' => $randBool,
             ],
@@ -685,8 +684,6 @@ class BackoffUnitTest extends PHPUnitTestCase
      */
     public static function test_that_backoff_calls_exception_callbacks(): void
     {
-        $strategy = BackoffStrategy::noop()->maxAttempts(2);
-
         $count1 = 0;
         $callback1 = function (Throwable $x) use (&$count1) {
             $count1++;
@@ -755,7 +752,8 @@ class BackoffUnitTest extends PHPUnitTestCase
 
         // callUponException called once
         $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-        $backoff = Backoff::new($strategy)
+        $backoff = Backoff::noop()
+            ->maxAttempts(2)
             ->retryExceptions()
             ->rethrowLastException(false)
             ->callUponException($callback1); // <<<
@@ -768,7 +766,8 @@ class BackoffUnitTest extends PHPUnitTestCase
 
         // callUponException called with an array
         $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-        $backoff = Backoff::new($strategy)
+        $backoff = Backoff::noop()
+            ->maxAttempts(2)
             ->retryExceptions()
             ->rethrowLastException(false)
             ->callUponException([$callback1, $callback2]); // <<<
@@ -782,7 +781,8 @@ class BackoffUnitTest extends PHPUnitTestCase
 
         // callUponException called with an array, and single callback
         $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-        $backoff = Backoff::new($strategy)
+        $backoff = Backoff::noop()
+            ->maxAttempts(2)
             ->retryExceptions()
             ->rethrowLastException(false)
             ->callUponException([$callback1, $callback2], $callback3); // <<<
@@ -797,7 +797,8 @@ class BackoffUnitTest extends PHPUnitTestCase
 
         // callUponException called with an array and another array
         $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-        $backoff = Backoff::new($strategy)
+        $backoff = Backoff::noop()
+            ->maxAttempts(2)
             ->retryExceptions()
             ->rethrowLastException(false)
             ->callUponException([$callback1], [$callback2, $callback3]); // <<<
@@ -812,7 +813,8 @@ class BackoffUnitTest extends PHPUnitTestCase
 
         // callUponException called several times
         $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-        $backoff = Backoff::new($strategy)
+        $backoff = Backoff::noop()
+            ->maxAttempts(2)
             ->retryExceptions()
             ->rethrowLastException(false)
             ->callUponException($callback1) // <<<
@@ -828,7 +830,8 @@ class BackoffUnitTest extends PHPUnitTestCase
 
         // a callback passed that has no parameters
         $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-        $backoff = Backoff::new($strategy)
+        $backoff = Backoff::noop()
+            ->maxAttempts(2)
             ->retryExceptions()
             ->rethrowLastException(false)
             ->callUponException($callback1, $callback4); // <<<
@@ -842,7 +845,8 @@ class BackoffUnitTest extends PHPUnitTestCase
 
         // a callback passed that expects a BackoffException to be passed
         $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-        $backoff = Backoff::new($strategy)
+        $backoff = Backoff::noop()
+            ->maxAttempts(2)
             ->retryExceptions()
             ->rethrowLastException(false)
             ->callUponException($callback1, $callback5); // <<<
@@ -856,7 +860,8 @@ class BackoffUnitTest extends PHPUnitTestCase
 
         // a callback passed that expects a BackoffInitialisationException to be passed
         $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-        $backoff = Backoff::new($strategy)
+        $backoff = Backoff::noop()
+            ->maxAttempts(2)
             ->retryExceptions()
             ->rethrowLastException(false)
             ->callUponException($callback1, $callback6); // <<<
@@ -870,7 +875,8 @@ class BackoffUnitTest extends PHPUnitTestCase
 
         // a callback passed that expects more than 1 parameter
         $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-        $backoff = Backoff::new($strategy)
+        $backoff = Backoff::noop()
+            ->maxAttempts(2)
             ->retryExceptions()
             ->rethrowLastException(false)
             ->callUponException($callback1, $callback8); // <<<
@@ -887,7 +893,8 @@ class BackoffUnitTest extends PHPUnitTestCase
 
         // a callback passed that expects a non-exception parameter
         $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-        $backoff = Backoff::new($strategy)
+        $backoff = Backoff::noop()
+            ->maxAttempts(2)
             ->retryExceptions()
             ->rethrowLastException(false)
             ->callUponException($callback1, $callback7); // <<<
@@ -904,7 +911,8 @@ class BackoffUnitTest extends PHPUnitTestCase
 
         // a callback passed that expects a non-exception parameter
         $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-        $backoff = Backoff::new($strategy)
+        $backoff = Backoff::noop()
+            ->maxAttempts(2)
             ->retryExceptions()
             ->rethrowLastException(false)
             ->callUponException($callback1, $callback8); // <<<
@@ -921,7 +929,8 @@ class BackoffUnitTest extends PHPUnitTestCase
 
         // a callback passed that expects a non-exception parameter
         $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-        $backoff = Backoff::new($strategy)
+        $backoff = Backoff::noop()
+            ->maxAttempts(2)
             ->retryExceptions()
             ->rethrowLastException(false)
             ->callUponException($callback1, $callback9); // <<<
@@ -938,7 +947,8 @@ class BackoffUnitTest extends PHPUnitTestCase
 
         // a callback passed that expects a non-exception parameter
         $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-        $backoff = Backoff::new($strategy)
+        $backoff = Backoff::noop()
+            ->maxAttempts(2)
             ->retryExceptions()
             ->rethrowLastException(false)
             ->callUponException($callback1, $callback10); // <<<
@@ -955,7 +965,8 @@ class BackoffUnitTest extends PHPUnitTestCase
 
         // a callback passed that expects a non-exception parameter
         $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-        $backoff = Backoff::new($strategy)
+        $backoff = Backoff::noop()
+            ->maxAttempts(2)
             ->retryExceptions()
             ->rethrowLastException(false)
             ->callUponException($callback1, $invokableClass); // <<<
@@ -966,7 +977,8 @@ class BackoffUnitTest extends PHPUnitTestCase
 
         // a callback passed that expects a non-exception parameter
         $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-        $backoff = Backoff::new($strategy)
+        $backoff = Backoff::noop()
+            ->maxAttempts(2)
             ->retryExceptions()
             ->rethrowLastException(false)
             ->callUponException($callback1, $callable); // <<<
@@ -977,7 +989,8 @@ class BackoffUnitTest extends PHPUnitTestCase
 
         // a callback passed with an intersection type hint including Exceptions
         $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-        $backoff = Backoff::new($strategy)
+        $backoff = Backoff::noop()
+            ->maxAttempts(2)
             ->retryExceptions()
             ->rethrowLastException(false)
             ->callUponException($callback1, $callback11); // <<<
@@ -996,7 +1009,8 @@ class BackoffUnitTest extends PHPUnitTestCase
 
             // a callback passed with an intersection type hint including Exceptions
             $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-            $backoff = Backoff::new($strategy)
+            $backoff = Backoff::noop()
+                ->maxAttempts(2)
                 ->retryExceptions()
                 ->rethrowLastException(false)
                 ->callUponException($callback1, $callback12); // <<<
@@ -1012,7 +1026,8 @@ class BackoffUnitTest extends PHPUnitTestCase
         if (version_compare(PHP_VERSION, '8.1.0', '>=')) {
             // a callback passed with an intersection type hint excluding Exceptions
             $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-            $backoff = Backoff::new($strategy)
+            $backoff = Backoff::noop()
+                ->maxAttempts(2)
                 ->retryExceptions()
                 ->rethrowLastException(false)
                 ->callUponException($callback1, $callback13); // <<<
@@ -1040,8 +1055,8 @@ class BackoffUnitTest extends PHPUnitTestCase
             throw new BackoffException();
         };
 
-        $strategy = BackoffStrategy::noop()->maxAttempts(5);
-        $backoff = Backoff::new($strategy)
+        $backoff = Backoff::noop()
+            ->maxAttempts(5)
             ->retryExceptions()
             ->dontRethrowLastException();
 

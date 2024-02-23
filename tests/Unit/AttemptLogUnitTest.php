@@ -222,6 +222,7 @@ class AttemptLogUnitTest extends PHPUnitTestCase
     public function test_that_constructor_throws_exception(): void
     {
         $this->expectException(BackoffInitialisationException::class);
+
         new AttemptLog(
             1,
             null,

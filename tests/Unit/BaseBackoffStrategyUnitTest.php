@@ -6,17 +6,17 @@ use CodeDistortion\Backoff\BackoffStrategy;
 use CodeDistortion\Backoff\Exceptions\BackoffInitialisationException;
 use CodeDistortion\Backoff\Jitter\FullJitter;
 use CodeDistortion\Backoff\Settings;
-use CodeDistortion\Backoff\Strategies\CallbackBackoffAlgorithm;
-use CodeDistortion\Backoff\Strategies\DecorrelatedBackoffAlgorithm;
-use CodeDistortion\Backoff\Strategies\ExponentialBackoffAlgorithm;
-use CodeDistortion\Backoff\Strategies\FibonacciBackoffAlgorithm;
-use CodeDistortion\Backoff\Strategies\FixedBackoffAlgorithm;
-use CodeDistortion\Backoff\Strategies\LinearBackoffAlgorithm;
-use CodeDistortion\Backoff\Strategies\NoBackoffAlgorithm;
-use CodeDistortion\Backoff\Strategies\NoopBackoffAlgorithm;
-use CodeDistortion\Backoff\Strategies\PolynomialBackoffAlgorithm;
-use CodeDistortion\Backoff\Strategies\RandomBackoffAlgorithm;
-use CodeDistortion\Backoff\Strategies\SequenceBackoffAlgorithm;
+use CodeDistortion\Backoff\Algorithms\CallbackBackoffAlgorithm;
+use CodeDistortion\Backoff\Algorithms\DecorrelatedBackoffAlgorithm;
+use CodeDistortion\Backoff\Algorithms\ExponentialBackoffAlgorithm;
+use CodeDistortion\Backoff\Algorithms\FibonacciBackoffAlgorithm;
+use CodeDistortion\Backoff\Algorithms\FixedBackoffAlgorithm;
+use CodeDistortion\Backoff\Algorithms\LinearBackoffAlgorithm;
+use CodeDistortion\Backoff\Algorithms\NoBackoffAlgorithm;
+use CodeDistortion\Backoff\Algorithms\NoopBackoffAlgorithm;
+use CodeDistortion\Backoff\Algorithms\PolynomialBackoffAlgorithm;
+use CodeDistortion\Backoff\Algorithms\RandomBackoffAlgorithm;
+use CodeDistortion\Backoff\Algorithms\SequenceBackoffAlgorithm;
 use CodeDistortion\Backoff\Tests\PHPUnitTestCase;
 use CodeDistortion\Backoff\Tests\Unit\Support\FixedBackoffWithNoJitterAlgorithm;
 
@@ -125,22 +125,22 @@ class BaseBackoffStrategyUnitTest extends PHPUnitTestCase
     {
         // jitter allowed, but disabled
         $algorithm = new FixedBackoffAlgorithm(1);
-        $strategy = BackoffStrategy::custom($algorithm);
+        $strategy = BackoffStrategy::new($algorithm);
         self::assertSame([1, 1, 1, 1, 1], $strategy->generateTestSequence(5)['delay']);
 
         // jitter allowed, and enabled
         $algorithm = new FixedBackoffAlgorithm(1);
-        $strategy = BackoffStrategy::custom($algorithm)->fullJitter();
+        $strategy = BackoffStrategy::new($algorithm)->fullJitter();
         self::assertNotSame([1, 1, 1, 1, 1], $strategy->generateTestSequence(5)['delay']);
 
         // jitter disallowed, and disabled
         $algorithm = new FixedBackoffWithNoJitterAlgorithm(1);
-        $strategy = BackoffStrategy::custom($algorithm);
+        $strategy = BackoffStrategy::new($algorithm);
         self::assertSame([1, 1, 1, 1, 1], $strategy->generateTestSequence(5)['delay']);
 
         // jitter disallowed, but enabled
         $algorithm = new FixedBackoffWithNoJitterAlgorithm(1);
-        $strategy = BackoffStrategy::custom($algorithm)->fullJitter();
+        $strategy = BackoffStrategy::new($algorithm)->fullJitter();
         self::assertSame([1, 1, 1, 1, 1], $strategy->generateTestSequence(5)['delay']);
     }
 
@@ -224,6 +224,30 @@ class BaseBackoffStrategyUnitTest extends PHPUnitTestCase
             5, // <<< max-delay
         );
         self::assertSame([1, 2, 3, 4, 5, 5, 5, 5, 5, 5], $strategy->generateTestSequence(10)['delay']);
+    }
+
+    /**
+     * Test that the backoff strategy applies bounds properly to the delay.
+     *
+     * @test
+     *
+     * @return void
+     */
+    public static function test_that_bounds_are_applied_properly(): void
+    {
+        $strategy = new BackoffStrategy(
+            new SequenceBackoffAlgorithm([-1, 0, 1]),
+            null,
+            null,
+            0.5, // <<< max-delay
+        );
+
+        $strategy->performBackoffLogic();
+        self::assertSame(0, $strategy->getDelay());
+        $strategy->performBackoffLogic();
+        self::assertSame(0, $strategy->getDelay());
+        $strategy->performBackoffLogic();
+        self::assertSame(0.5, $strategy->getDelay());
     }
 
 
@@ -349,7 +373,7 @@ class BaseBackoffStrategyUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
-    public static function test_that_backoff_strategy_can_start_with_the_first_iteration(): void
+    public static function test_that_backoff_strategy_can_be_triggered_the_first_iteration(): void
     {
         $strategy = new BackoffStrategy(
             new LinearBackoffAlgorithm(1),
@@ -430,7 +454,7 @@ class BaseBackoffStrategyUnitTest extends PHPUnitTestCase
         );
         self::assertSame([0, 0, 0, 0, 0, 0, 0, 0, 0, 0], $strategy->generateTestSequence(10)['delay']);
 
-        // make sure it stops when the backoff algorithm says to
+        // make sure it still stops when the backoff algorithm says to
         $strategy = new BackoffStrategy(
             new SequenceBackoffAlgorithm([1, 2, 3]),
             null,
@@ -568,6 +592,58 @@ class BaseBackoffStrategyUnitTest extends PHPUnitTestCase
         self::assertSame([null, 1_000_000, 2_000_000, 3_000_000, 4_000_000], $delaysMicroseconds);
     }
 
+    /**
+     * Test that the backoff strategy rounds the delay and jittered delay values it generates when using ms and us.
+     *
+     * @test
+     *
+     * @return void
+     */
+    public static function test_that_delay_and_jittered_delay_have_values_rounded_when_ms_and_us(): void
+    {
+        $algorithm = new SequenceBackoffAlgorithm([1.1]);
+
+        // in seconds
+        $strategy = BackoffStrategy::new($algorithm)->noJitter()->unitSeconds();
+        $delays = $strategy->generateTestSequence(1);
+        self::assertIsFloat($delays['delay'][0]);
+        self::assertSame([1.1], $delays['delay']);
+        self::assertSame($delays['delay'], $delays['delayInSeconds']);
+
+        // with jitter
+        $strategy = BackoffStrategy::new($algorithm)->fullJitter()->unitSeconds();
+        $delays = $strategy->generateTestSequence(1);
+        self::assertIsFloat($delays['delay'][0]);
+
+
+
+        // in milliseconds
+        $strategy = BackoffStrategy::new($algorithm)->noJitter()->unitMs();
+        $delays = $strategy->generateTestSequence(1);
+        self::assertIsInt($delays['delay'][0]);
+        self::assertSame([1], $delays['delay']);
+        self::assertSame($delays['delay'], $delays['delayInMs']);
+
+        // with jitter
+        $strategy = BackoffStrategy::new($algorithm)->fullJitter()->unitMs();
+        $delays = $strategy->generateTestSequence(1);
+        self::assertIsInt($delays['delay'][0]);
+
+
+
+        // in microseconds
+        $strategy = BackoffStrategy::new($algorithm)->noJitter()->unitUs();
+        $delays = $strategy->generateTestSequence(1);
+        self::assertIsInt($delays['delay'][0]);
+        self::assertSame([1], $delays['delay']);
+        self::assertSame($delays['delay'], $delays['delayInUs']);
+
+        // with jitter
+        $strategy = BackoffStrategy::new($algorithm)->fullJitter()->unitUs();
+        $delays = $strategy->generateTestSequence(1);
+        self::assertIsInt($delays['delay'][0]);
+    }
+
 
 
 
@@ -601,30 +677,6 @@ class BaseBackoffStrategyUnitTest extends PHPUnitTestCase
         );
         self::assertTrue($strategy->performBackoffLogic());
         self::assertFalse($strategy->performBackoffLogic()); // the backoff algorithm chose to stop
-    }
-
-    /**
-     * Test that the backoff strategy applies bounds properly to the delay.
-     *
-     * @test
-     *
-     * @return void
-     */
-    public static function test_that_bounds_are_applied_properly(): void
-    {
-        $strategy = new BackoffStrategy(
-            new SequenceBackoffAlgorithm([-1, 0, 1]),
-            null,
-            null,
-            0.5, // <<< max-delay
-        );
-
-        $strategy->performBackoffLogic();
-        self::assertSame(0, $strategy->getDelay());
-        $strategy->performBackoffLogic();
-        self::assertSame(0, $strategy->getDelay());
-        $strategy->performBackoffLogic();
-        self::assertSame(0.5, $strategy->getDelay());
     }
 
     /**
@@ -673,13 +725,65 @@ class BaseBackoffStrategyUnitTest extends PHPUnitTestCase
     }
 
     /**
-     * Check that the backoff strategy's shouldStop() method returns true/false properly.
+     * Check that the backoff strategy's isFirstAttempt() method returns true/false properly.
      *
      * @test
      *
      * @return void
      */
-    public static function test_that_should_stop_returns_true_or_false_properly(): void
+    public static function test_that_is_first_attempt_returns_true_or_false_properly(): void
+    {
+        $algorithm = new NoopBackoffAlgorithm();
+
+        // when running $strategy->step() at the beginning of the loop
+        $strategy = BackoffStrategy::new($algorithm)->maxAttempts(5)->runsBeforeFirstAttempt();
+        $count = 0;
+        while ($strategy->step()) {
+            self::assertSame(++$count == 1, $strategy->isFirstAttempt());
+        }
+
+        // when running $strategy->step() at the end of the loop
+        $strategy = BackoffStrategy::new($algorithm)->maxAttempts(5);
+        $count = 0;
+        do {
+            self::assertSame(++$count == 1, $strategy->isFirstAttempt());
+        } while ($strategy->step());
+    }
+
+    /**
+     * Check that the backoff strategy's isLastAttempt() method returns true/false properly.
+     *
+     * @test
+     *
+     * @return void
+     */
+    public static function test_that_is_last_attempt_returns_true_or_false_properly(): void
+    {
+        $algorithm = new NoopBackoffAlgorithm();
+
+        // when running $strategy->step() at the beginning of the loop
+        $strategy = BackoffStrategy::new($algorithm)->maxAttempts(5)->runsBeforeFirstAttempt();
+        $count = 0;
+        while ($strategy->step()) {
+            self::assertSame(++$count == 5, $strategy->isLastAttempt());
+        }
+
+        // when running $strategy->step() at the end of the loop
+        $strategy = BackoffStrategy::new($algorithm)->maxAttempts(5);
+        $count = 0;
+        do {
+            self::assertSame(++$count == 5, $strategy->isLastAttempt());
+        } while ($strategy->step());
+    }
+
+    /**
+     * Check that the backoff strategy's hasStopped() method returns true/false properly.
+     *
+     * @test
+     *
+     * @return void
+     */
+    public static function test_that_has_stopped_returns_true_or_false_properly(): void
     {
         $strategy = new BackoffStrategy(
             new SequenceBackoffAlgorithm([1]),
@@ -705,15 +809,16 @@ class BaseBackoffStrategyUnitTest extends PHPUnitTestCase
     }
 
     /**
-     * Test that the backoff strategy throws an exception.
+     * Test that the backoff strategy throws an exception when an invalid unit type is passed.
      *
      * @test
      *
      * @return void
      */
-    public function test_that_backoff_strategy_throws_an_exception(): void
+    public function test_that_backoff_strategy_throws_an_exception_due_to_invalid_unit_type(): void
     {
         $this->expectException(BackoffInitialisationException::class);
+
         new BackoffStrategy(
             new SequenceBackoffAlgorithm([1]),
             null,
@@ -722,6 +827,10 @@ class BaseBackoffStrategyUnitTest extends PHPUnitTestCase
             'invalid', // <<< invalid unit type
         );
     }
+
+
+
+
 
     /**
      * Test aspects of the generateTestSequence() method.

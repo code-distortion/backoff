@@ -1,16 +1,17 @@
 <?php
 
-namespace CodeDistortion\Backoff\Strategies;
+namespace CodeDistortion\Backoff\Algorithms;
 
-use CodeDistortion\Backoff\Exceptions\BackoffInitialisationException;
 use CodeDistortion\Backoff\Support\BaseBackoffAlgorithm;
 use CodeDistortion\Backoff\Support\BackoffAlgorithmInterface;
 use CodeDistortion\Backoff\Support\Support;
 
 /**
- * A class that provides a random backoff algorithm.
+ * A class that provides a decorrelated backoff algorithm.
+ *
+ * This algorithm uses the previous delay feedback to influence the next delay.
  */
-class RandomBackoffAlgorithm extends BaseBackoffAlgorithm implements BackoffAlgorithmInterface
+class DecorrelatedBackoffAlgorithm extends BaseBackoffAlgorithm implements BackoffAlgorithmInterface
 {
     /** @var boolean Whether jitter may be applied to the delays calculated by this algorithm. */
     public bool $jitterMayBeApplied = false;
@@ -20,20 +21,13 @@ class RandomBackoffAlgorithm extends BaseBackoffAlgorithm implements BackoffAlgo
     /**
      * Constructor
      *
-     * @param integer|float $minDelay The minimum delay to use.
-     * @param integer|float $maxDelay The maximum delay to use.
-     * @throws BackoffInitialisationException Thrown when the minDelay is greater than the maxDelay.
+     * @param integer|float $baseDelay  The base delay to use.
+     * @param integer|float $multiplier The amount to multiply the previous delay by (default 3).
      */
     public function __construct(
-        private int|float $minDelay,
-        private int|float $maxDelay,
+        private int|float $baseDelay,
+        private int|float $multiplier = 3,
     ) {
-        if ($minDelay > $maxDelay) {
-            throw BackoffInitialisationException::randMinIsGreaterThanMax($minDelay, $maxDelay);
-        }
-
-        $this->minDelay = max(0, $this->minDelay);
-        $this->maxDelay = max(0, $this->maxDelay);
     }
 
     /**
@@ -50,9 +44,9 @@ class RandomBackoffAlgorithm extends BaseBackoffAlgorithm implements BackoffAlgo
      */
     public function calculateBaseDelay(int $retryNumber, int|float|null $prevDelay): int|float|null
     {
-        return Support::randFloat(
-            $this->minDelay,
-            $this->maxDelay
-        );
+        $min = $this->baseDelay;
+        $max = ($prevDelay ?? $this->baseDelay) * $this->multiplier;
+
+        return Support::randFloat($min, $max);
     }
 }

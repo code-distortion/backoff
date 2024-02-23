@@ -1,30 +1,33 @@
 <?php
 
-namespace CodeDistortion\Backoff\Strategies;
+namespace CodeDistortion\Backoff\Algorithms;
 
+use CodeDistortion\Backoff\Exceptions\BackoffRuntimeException;
 use CodeDistortion\Backoff\Support\BaseBackoffAlgorithm;
 use CodeDistortion\Backoff\Support\BackoffAlgorithmInterface;
 
 /**
- * A class that provides a Fibonacci backoff algorithm.
+ * A class that provides a custom (callback-based) backoff algorithm.
  */
-class FibonacciBackoffAlgorithm extends BaseBackoffAlgorithm implements BackoffAlgorithmInterface
+class CallbackBackoffAlgorithm extends BaseBackoffAlgorithm implements BackoffAlgorithmInterface
 {
     /** @var boolean Whether jitter may be applied to the delays calculated by this algorithm. */
     public bool $jitterMayBeApplied = true;
+
+    /** @var callable The callback that will determine the delays to use. */
+    private $callback;
 
 
 
     /**
      * Constructor
      *
-     * @param integer|float $initialDelay The initial delay to use.
-     * @param boolean       $includeFirst Whether to include the first value in the Fibonacci sequence or not.
+     * @param callable $callback The callback that determines the delays to use:
+     *                           function(int $retryNumber): int|float|false.
      */
-    public function __construct(
-        private int|float $initialDelay,
-        private bool $includeFirst = false,
-    ) {
+    public function __construct(callable $callback)
+    {
+        $this->callback = $callback;
     }
 
     /**
@@ -38,20 +41,15 @@ class FibonacciBackoffAlgorithm extends BaseBackoffAlgorithm implements BackoffA
      * @param integer            $retryNumber The retry being attempted.
      * @param integer|float|null $prevDelay   The previous delay used (if any).
      * @return integer|float|null
+     * @throws BackoffRuntimeException Thrown when the callback returns an invalid value.
      */
     public function calculateBaseDelay(int $retryNumber, int|float|null $prevDelay): int|float|null
     {
-        $delay = 0;
-        $nextDelay = $this->initialDelay;
-        $max = $this->includeFirst
-            ? $retryNumber
-            : $retryNumber + 1;
+        $callback = $this->callback;
+        $delay = $callback($retryNumber);
 
-        /** @infection-ignore-all $count-- */
-        for ($count = 0; $count < $max; $count++) {
-            $temp = $nextDelay + $delay;
-            $delay = $nextDelay;
-            $nextDelay = $temp;
+        if (!is_int($delay) && !is_float($delay) && (!is_null($delay))) {
+            throw BackoffRuntimeException::customBackoffCallbackGaveInvalidReturnValue();
         }
 
         return $delay;

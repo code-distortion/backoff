@@ -117,6 +117,7 @@ class JitterUnitTest extends PHPUnitTestCase
     public function test_that_custom_jitter_throws_exceptions(): void
     {
         $this->expectException(BackoffInitialisationException::class);
+
         new RangeJitter(1, 0);
     }
 
@@ -131,6 +132,7 @@ class JitterUnitTest extends PHPUnitTestCase
     public function test_that_custom_jitter_throws_exceptions2(): void
     {
         $this->expectException(BackoffInitialisationException::class);
+
         new RangeJitter(-1, -2);
     }
 }

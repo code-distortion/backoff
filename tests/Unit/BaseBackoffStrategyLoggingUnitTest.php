@@ -2,8 +2,10 @@
 
 namespace CodeDistortion\Backoff\Tests\Unit;
 
-use CodeDistortion\Backoff\BackoffStrategy;
+use CodeDistortion\Backoff\Algorithms\LinearBackoffAlgorithm;
+use CodeDistortion\Backoff\Algorithms\NoopBackoffAlgorithm;
 use CodeDistortion\Backoff\AttemptLog;
+use CodeDistortion\Backoff\BackoffStrategy;
 use CodeDistortion\Backoff\Settings;
 use CodeDistortion\Backoff\Support\Support;
 use CodeDistortion\Backoff\Tests\PHPUnitTestCase;
@@ -120,9 +122,12 @@ class BaseBackoffStrategyLoggingUnitTest extends PHPUnitTestCase
         $return = [];
 
 
+        $algorithm = new LinearBackoffAlgorithm(1000);
+
+
         // $backoff->step() called at the end of the loop
-        $callback = function () {
-            $backoff = BackoffStrategy::linear(1000)->unitUs()->maxAttempts(3);
+        $callback = function () use ($algorithm) {
+            $backoff = BackoffStrategy::new($algorithm)->unitUs()->maxAttempts(3);
             $attempts = 10;
             do {
             } while (($attempts-- > 0) && ($backoff->step()));
@@ -131,8 +136,8 @@ class BaseBackoffStrategyLoggingUnitTest extends PHPUnitTestCase
         $return[] = [$callback];
 
         //
-        $callback = function () {
-            $backoff = BackoffStrategy::linear(1000)->unitUs()->maxAttempts(3);
+        $callback = function () use ($algorithm) {
+            $backoff = BackoffStrategy::new($algorithm)->unitUs()->maxAttempts(3);
             $backoff->reset();
             $attempts = 10;
             do {
@@ -142,8 +147,8 @@ class BaseBackoffStrategyLoggingUnitTest extends PHPUnitTestCase
         $return[] = [$callback];
 
         //
-        $callback = function () {
-            $backoff = BackoffStrategy::linear(1000)->unitUs()->maxAttempts(3);
+        $callback = function () use ($algorithm) {
+            $backoff = BackoffStrategy::new($algorithm)->unitUs()->maxAttempts(3);
             $attempts = 10;
             do {
                 $latestLog = $backoff->latestLog();
@@ -153,8 +158,8 @@ class BaseBackoffStrategyLoggingUnitTest extends PHPUnitTestCase
         $return[] = [$callback];
 
         //
-        $callback = function () {
-            $backoff = BackoffStrategy::linear(1000)->unitUs()->maxAttempts(3);
+        $callback = function () use ($algorithm) {
+            $backoff = BackoffStrategy::new($algorithm)->unitUs()->maxAttempts(3);
             $backoff->reset();
             $attempts = 10;
             do {
@@ -166,8 +171,8 @@ class BaseBackoffStrategyLoggingUnitTest extends PHPUnitTestCase
 
 
         // $backoff->step() called at the beginning of the loop
-        $callback = function () {
-            $backoff = BackoffStrategy::linear(1000)->unitUs()->maxAttempts(3)->runsBeforeFirstAttempt();
+        $callback = function () use ($algorithm) {
+            $backoff = BackoffStrategy::new($algorithm)->unitUs()->maxAttempts(3)->runsBeforeFirstAttempt();
             $attempts = 10;
             while (($attempts-- > 0) && ($backoff->step())) {
                 $success = false;
@@ -177,8 +182,8 @@ class BaseBackoffStrategyLoggingUnitTest extends PHPUnitTestCase
         $return[] = [$callback];
 
         //
-        $callback = function () {
-            $backoff = BackoffStrategy::linear(1000)->unitUs()->maxAttempts(3)->runsBeforeFirstAttempt();
+        $callback = function () use ($algorithm) {
+            $backoff = BackoffStrategy::new($algorithm)->unitUs()->maxAttempts(3)->runsBeforeFirstAttempt();
             $backoff->reset();
             $attempts = 10;
             while (($attempts-- > 0) && ($backoff->step())) {
@@ -189,8 +194,8 @@ class BaseBackoffStrategyLoggingUnitTest extends PHPUnitTestCase
         $return[] = [$callback];
 
         //
-        $callback = function () {
-            $backoff = BackoffStrategy::linear(1000)->unitUs()->maxAttempts(3)->runsBeforeFirstAttempt();
+        $callback = function () use ($algorithm) {
+            $backoff = BackoffStrategy::new($algorithm)->unitUs()->maxAttempts(3)->runsBeforeFirstAttempt();
             $attempts = 10;
             while (($attempts-- > 0) && ($backoff->step())) {
                 $latestLog = $backoff->latestLog();
@@ -201,8 +206,8 @@ class BaseBackoffStrategyLoggingUnitTest extends PHPUnitTestCase
         $return[] = [$callback];
 
         //
-        $callback = function () {
-            $backoff = BackoffStrategy::linear(1000)->unitUs()->maxAttempts(3)->runsBeforeFirstAttempt();
+        $callback = function () use ($algorithm) {
+            $backoff = BackoffStrategy::new($algorithm)->unitUs()->maxAttempts(3)->runsBeforeFirstAttempt();
             $backoff->reset();
             $attempts = 10;
             while (($attempts-- > 0) && ($backoff->step())) {
@@ -219,12 +224,16 @@ class BaseBackoffStrategyLoggingUnitTest extends PHPUnitTestCase
     /**
      * Test that no logs are generated when no attempts are allowed.
      *
+     * @test
+     *
      * @return void
      */
     public function test_that_no_log_is_generated_when_no_attempts_are_allowed(): void
     {
+        $algorithm = new NoopBackoffAlgorithm();
+
         // logs are ok (maxAttempts 3)
-        $backoff = BackoffStrategy::linear(1)->unitMs()->maxAttempts(3)->runsBeforeFirstAttempt();
+        $backoff = BackoffStrategy::new($algorithm)->noMaxAttempts()->runsBeforeFirstAttempt();
         $backoff->step();
         $backoff->step();
         self::assertSame(2, $backoff->getAttemptNumber());
@@ -232,7 +241,7 @@ class BaseBackoffStrategyLoggingUnitTest extends PHPUnitTestCase
         self::assertCount(2, $backoff->logs());
 
         // logs are not ok (maxAttempts 0)
-        $backoff = BackoffStrategy::linear(1)->unitMs()->maxAttempts(0)->runsBeforeFirstAttempt();
+        $backoff = BackoffStrategy::new($algorithm)->maxAttempts(0)->runsBeforeFirstAttempt();
         $backoff->step();
         $backoff->step();
         self::assertSame(1, $backoff->getAttemptNumber());
@@ -241,13 +250,16 @@ class BaseBackoffStrategyLoggingUnitTest extends PHPUnitTestCase
     }
 
     /**
-     * Test that the BaseBackoffStrategy can be reset.
+     * Test that resetting the BaseBackoffStrategy will reset the logs.
+     *
+     * @test
      *
      * @return void
      */
     public static function test_that_reset_resets_the_logs(): void
     {
-        $backoff = BackoffStrategy::linear(1)->unitMs()->maxAttempts(3)->runsBeforeFirstAttempt();
+        $algorithm = new NoopBackoffAlgorithm();
+        $backoff = BackoffStrategy::new($algorithm)->runsBeforeFirstAttempt();
 
         $backoff->step();
         $backoff->step();
@@ -267,20 +279,41 @@ class BaseBackoffStrategyLoggingUnitTest extends PHPUnitTestCase
     /**
      * Test that the BaseBackoffStrategy populates the correct unit type.
      *
+     * @test
+     *
      * @return void
      */
     public static function test_the_logged_unit_type(): void
     {
-        $backoff = BackoffStrategy::linear(1)->unitSeconds()->maxAttempts(3)->runsBeforeFirstAttempt();
+        $algorithm = new NoopBackoffAlgorithm();
+
+        $backoff = BackoffStrategy::new($algorithm)->unitSeconds();
         $backoff->step();
         self::assertSame(Settings::UNIT_SECONDS, $backoff->latestLog()->unitType());
 
-        $backoff = BackoffStrategy::linear(1)->unitMs()->maxAttempts(3)->runsBeforeFirstAttempt();
+        $backoff = BackoffStrategy::new($algorithm)->unitMs();
         $backoff->step();
         self::assertSame(Settings::UNIT_MILLISECONDS, $backoff->latestLog()->unitType());
 
-        $backoff = BackoffStrategy::linear(1)->unitUs()->maxAttempts(3)->runsBeforeFirstAttempt();
+        $backoff = BackoffStrategy::new($algorithm)->unitUs();
         $backoff->step();
         self::assertSame(Settings::UNIT_MICROSECONDS, $backoff->latestLog()->unitType());
+    }
+
+    /**
+     * Test that the BaseBackoffStrategy doesn't overwrite an existing AttemptLog for the same step.
+     *
+     * @test
+     *
+     * @return void
+     */
+    public static function test_that_attempt_logs_arent_overwritten(): void
+    {
+        $algorithm = new NoopBackoffAlgorithm();
+        $backoff = BackoffStrategy::new($algorithm)->runsBeforeFirstAttempt();
+
+        $attemptLog1 = $backoff->latestLog();
+        $attemptLog2 = $backoff->latestLog();
+        self::assertSame($attemptLog1, $attemptLog2);
     }
 }

@@ -1,14 +1,14 @@
 <?php
 
-namespace CodeDistortion\Backoff\Strategies;
+namespace CodeDistortion\Backoff\Algorithms;
 
 use CodeDistortion\Backoff\Support\BaseBackoffAlgorithm;
 use CodeDistortion\Backoff\Support\BackoffAlgorithmInterface;
 
 /**
- * A class that provides a linear backoff algorithm.
+ * A class that provides a Fibonacci backoff algorithm.
  */
-class LinearBackoffAlgorithm extends BaseBackoffAlgorithm implements BackoffAlgorithmInterface
+class FibonacciBackoffAlgorithm extends BaseBackoffAlgorithm implements BackoffAlgorithmInterface
 {
     /** @var boolean Whether jitter may be applied to the delays calculated by this algorithm. */
     public bool $jitterMayBeApplied = true;
@@ -18,13 +18,12 @@ class LinearBackoffAlgorithm extends BaseBackoffAlgorithm implements BackoffAlgo
     /**
      * Constructor
      *
-     * @param integer|float      $initialDelay  The initial delay to use.
-     * @param integer|float|null $delayIncrease The amount to increase the delay by (optional, falls back to
-     *                                          $initialDelay).
+     * @param integer|float $initialDelay The initial delay to use.
+     * @param boolean       $includeFirst Whether to include the first value in the Fibonacci sequence or not.
      */
     public function __construct(
         private int|float $initialDelay,
-        private int|float|null $delayIncrease = null,
+        private bool $includeFirst = false,
     ) {
     }
 
@@ -42,8 +41,19 @@ class LinearBackoffAlgorithm extends BaseBackoffAlgorithm implements BackoffAlgo
      */
     public function calculateBaseDelay(int $retryNumber, int|float|null $prevDelay): int|float|null
     {
-        $delayIncrease = $this->delayIncrease ?? $this->initialDelay;
+        $delay = 0;
+        $nextDelay = $this->initialDelay;
+        $max = $this->includeFirst
+            ? $retryNumber
+            : $retryNumber + 1;
 
-        return $this->initialDelay + (($retryNumber - 1) * $delayIncrease);
+        /** @infection-ignore-all $count-- */
+        for ($count = 0; $count < $max; $count++) {
+            $temp = $nextDelay + $delay;
+            $delay = $nextDelay;
+            $nextDelay = $temp;
+        }
+
+        return $delay;
     }
 }

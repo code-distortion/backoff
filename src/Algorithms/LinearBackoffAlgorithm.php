@@ -1,32 +1,30 @@
 <?php
 
-namespace CodeDistortion\Backoff\Strategies;
+namespace CodeDistortion\Backoff\Algorithms;
 
 use CodeDistortion\Backoff\Support\BaseBackoffAlgorithm;
 use CodeDistortion\Backoff\Support\BackoffAlgorithmInterface;
-use CodeDistortion\Backoff\Support\Support;
 
 /**
- * A class that provides a decorrelated backoff algorithm.
- *
- * This algorithm uses the previous delay feedback to influence the next delay.
+ * A class that provides a linear backoff algorithm.
  */
-class DecorrelatedBackoffAlgorithm extends BaseBackoffAlgorithm implements BackoffAlgorithmInterface
+class LinearBackoffAlgorithm extends BaseBackoffAlgorithm implements BackoffAlgorithmInterface
 {
     /** @var boolean Whether jitter may be applied to the delays calculated by this algorithm. */
-    public bool $jitterMayBeApplied = false;
+    public bool $jitterMayBeApplied = true;
 
 
 
     /**
      * Constructor
      *
-     * @param integer|float $baseDelay  The base delay to use.
-     * @param integer|float $multiplier The amount to multiply the previous delay by (default 3).
+     * @param integer|float      $initialDelay  The initial delay to use.
+     * @param integer|float|null $delayIncrease The amount to increase the delay by (optional, falls back to
+     *                                          $initialDelay).
      */
     public function __construct(
-        private int|float $baseDelay,
-        private int|float $multiplier = 3,
+        private int|float $initialDelay,
+        private int|float|null $delayIncrease = null,
     ) {
     }
 
@@ -44,9 +42,8 @@ class DecorrelatedBackoffAlgorithm extends BaseBackoffAlgorithm implements Backo
      */
     public function calculateBaseDelay(int $retryNumber, int|float|null $prevDelay): int|float|null
     {
-        $min = $this->baseDelay;
-        $max = ($prevDelay ?? $this->baseDelay) * $this->multiplier;
+        $delayIncrease = $this->delayIncrease ?? $this->initialDelay;
 
-        return Support::randFloat($min, $max);
+        return $this->initialDelay + (($retryNumber - 1) * $delayIncrease);
     }
 }

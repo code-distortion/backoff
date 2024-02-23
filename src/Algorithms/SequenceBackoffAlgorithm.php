@@ -1,14 +1,14 @@
 <?php
 
-namespace CodeDistortion\Backoff\Strategies;
+namespace CodeDistortion\Backoff\Algorithms;
 
 use CodeDistortion\Backoff\Support\BaseBackoffAlgorithm;
 use CodeDistortion\Backoff\Support\BackoffAlgorithmInterface;
 
 /**
- * A class that provides a polynomial backoff algorithm.
+ * A class that provides a random backoff algorithm.
  */
-class PolynomialBackoffAlgorithm extends BaseBackoffAlgorithm implements BackoffAlgorithmInterface
+class SequenceBackoffAlgorithm extends BaseBackoffAlgorithm implements BackoffAlgorithmInterface
 {
     /** @var boolean Whether jitter may be applied to the delays calculated by this algorithm. */
     public bool $jitterMayBeApplied = true;
@@ -18,12 +18,10 @@ class PolynomialBackoffAlgorithm extends BaseBackoffAlgorithm implements Backoff
     /**
      * Constructor
      *
-     * @param integer|float $initialDelay The initial delay to use.
-     * @param integer|float $power        The power to raise the retry number to (default 2).
+     * @param array<integer|float> $delays The sequence of delays to use.
      */
     public function __construct(
-        private int|float $initialDelay,
-        private int|float $power = 2,
+        private array $delays,
     ) {
     }
 
@@ -41,6 +39,6 @@ class PolynomialBackoffAlgorithm extends BaseBackoffAlgorithm implements Backoff
      */
     public function calculateBaseDelay(int $retryNumber, int|float|null $prevDelay): int|float|null
     {
-        return $this->initialDelay * pow($retryNumber, $this->power);
+        return $this->delays[$retryNumber - 1] ?? null;
     }
 }

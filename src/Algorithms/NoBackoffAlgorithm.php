@@ -1,29 +1,19 @@
 <?php
 
-namespace CodeDistortion\Backoff\Strategies;
+namespace CodeDistortion\Backoff\Algorithms;
 
-use CodeDistortion\Backoff\Support\BaseBackoffAlgorithm;
 use CodeDistortion\Backoff\Support\BackoffAlgorithmInterface;
+use CodeDistortion\Backoff\Support\BaseBackoffAlgorithm;
 
 /**
- * A class that provides a fixed backoff algorithm.
+ * A class that provides a "no backoff" algorithm - it returns false straight away to stop.
  */
-class FixedBackoffAlgorithm extends BaseBackoffAlgorithm implements BackoffAlgorithmInterface
+class NoBackoffAlgorithm extends BaseBackoffAlgorithm implements BackoffAlgorithmInterface
 {
     /** @var boolean Whether jitter may be applied to the delays calculated by this algorithm. */
-    public bool $jitterMayBeApplied = true;
+    public bool $jitterMayBeApplied = false;
 
 
-
-    /**
-     * Constructor
-     *
-     * @param integer|float $delay The delay to use.
-     */
-    public function __construct(
-        private int|float $delay,
-    ) {
-    }
 
     /**
      * Calculate the delay needed before retrying an action.
@@ -39,6 +29,6 @@ class FixedBackoffAlgorithm extends BaseBackoffAlgorithm implements BackoffAlgor
      */
     public function calculateBaseDelay(int $retryNumber, int|float|null $prevDelay): int|float|null
     {
-        return $this->delay;
+        return null;
     }
 }

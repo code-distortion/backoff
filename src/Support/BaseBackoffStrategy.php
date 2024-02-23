@@ -10,11 +10,12 @@ use DateTime;
 /**
  * Class that implements the backoff strategy logic.
  */
-abstract class BaseBackoffStrategy implements BackoffStrategyInterface
+abstract class BaseBackoffStrategy
 {
-    // settings - the rest are in the constructor
+    // settings - the rest are defined in the construction
+    // these are here because null can be passed meaning "use the default", but I don't want the var to be nullable.
 
-    /** @var string The unit type to use (from Settings::UNIT_XXX, default: seconds). */
+    /** @var string The unit type to use (from Settings::UNIT_XXX). */
     protected string $unitType;
 
 
@@ -206,7 +207,7 @@ abstract class BaseBackoffStrategy implements BackoffStrategyInterface
         }
 
         // handle the first call - don't use a delay if this is the actual first attempt
-        if ($this->isFirstAttempt()) {
+        if ($this->isFirstAttemptX()) {
             $this->attemptNumber = 1;
             return true;
         }
@@ -244,7 +245,7 @@ abstract class BaseBackoffStrategy implements BackoffStrategyInterface
      *
      * @return boolean
      */
-    private function isFirstAttempt(): bool
+    private function isFirstAttemptX(): bool
     {
         if (!is_null($this->attemptNumber)) {
             return false;
@@ -299,6 +300,20 @@ abstract class BaseBackoffStrategy implements BackoffStrategyInterface
     }
 
     /**
+     * Round the delay if its units should be integers.
+     *
+     * @param integer|float $delay The delay to round.
+     * @return integer|float
+     */
+    private function applyUnitRounding(int|float $delay): int|float
+    {
+        return match ($this->unitType) {
+            Settings::UNIT_MILLISECONDS, Settings::UNIT_MICROSECONDS => (int) round($delay),
+            default => $delay,
+        };
+    }
+
+    /**
      * Use the delay that was calculated, applying jitter if desired, and only when delays are enabled.
      *
      * @param integer|float $delay The delay to use.
@@ -313,10 +328,13 @@ abstract class BaseBackoffStrategy implements BackoffStrategyInterface
         }
 
         $delay = $this->enforceBounds($delay);
+        $delay = $this->applyUnitRounding($delay);
+
 //        $this->nextBaseDelay = $delay;
         $this->nextDelay = $this->backoffAlgorithm->jitterMayBeApplied()
             ? $this->applyJitter($delay)
             : $delay;
+        $this->nextDelay = $this->applyUnitRounding($this->nextDelay);
     }
 
     /**
@@ -364,9 +382,17 @@ abstract class BaseBackoffStrategy implements BackoffStrategyInterface
     }
 
     /**
-     * Find out if the backoff strategy is currently on the last step.
+     * Find out if the backoff strategy is currently on the first step.
      *
-     * todo - test this method
+     * @return boolean
+     */
+    public function isFirstAttempt(): bool
+    {
+        return $this->getAttemptNumber() == 1;
+    }
+
+    /**
+     * Find out if the backoff strategy is currently on the last step.
      *
      * @return boolean
      */
@@ -377,8 +403,6 @@ abstract class BaseBackoffStrategy implements BackoffStrategyInterface
 
     /**
      * Check if the backoff strategy should stop.
-     *
-     * todo - test the addition of isLastAttempt()
      *
      * @return boolean
      */
@@ -436,7 +460,7 @@ abstract class BaseBackoffStrategy implements BackoffStrategyInterface
     /**
      * Sleep until a specific time, in nanoseconds.
      *
-     * @infection-ignore-all (so many things).
+     * @infection-ignore-all (so many mutants).
      *
      * @param integer $start        The hrtime(true) start time.
      * @param integer $microseconds The number of microseconds to sleep for.
@@ -629,7 +653,7 @@ abstract class BaseBackoffStrategy implements BackoffStrategyInterface
      * @internal - For testing purposes.
      *
      * @param integer $maxSteps The maximum number of steps to run through.
-     * @return array<string,array<float|integer|null>|integer>
+     * @return array<string,array<integer|float|null>|integer>
      */
     public function generateTestSequence(int $maxSteps): array
     {

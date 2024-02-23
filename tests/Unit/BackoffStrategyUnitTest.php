@@ -7,8 +7,8 @@ use CodeDistortion\Backoff\Exceptions\BackoffRuntimeException;
 use CodeDistortion\Backoff\Jitter\FullJitter;
 use CodeDistortion\Backoff\Jitter\RangeJitter;
 use CodeDistortion\Backoff\Settings;
-use CodeDistortion\Backoff\Strategies\FixedBackoffAlgorithm;
-use CodeDistortion\Backoff\Strategies\LinearBackoffAlgorithm;
+use CodeDistortion\Backoff\Algorithms\FixedBackoffAlgorithm;
+use CodeDistortion\Backoff\Algorithms\LinearBackoffAlgorithm;
 use CodeDistortion\Backoff\Tests\PHPUnitTestCase;
 
 /**
@@ -57,65 +57,120 @@ class BackoffStrategyUnitTest extends PHPUnitTestCase
             new LinearBackoffAlgorithm(1),
             new FullJitter(),
             8,
-            5,
+            4,
             Settings::UNIT_MILLISECONDS,
             true,
             true,
             true,
             true,
         );
-        self::assertNotSame([null, 0, 1, 2, 3, 4, 5, 5, 5], $backoff->generateTestSequence(20)['delay']);
+        self::assertNotSame([null, 0, 1, 2, 3, 4, 4, 4], $backoff->generateTestSequence(10)['delay']);
 
 
 
         // fixed
         $backoff = BackoffStrategy::fixed(5);
-        self::assertSame([5, 5, 5, 5, 5], $backoff->generateTestSequence(5)['delay']);
+        self::assertSame([5, 5, 5, 5], $backoff->generateTestSequence(10)['delay']);
+
+        // fixed - in milliseconds
+        $backoff = BackoffStrategy::fixedMs(5);
+        $delays = $backoff->generateTestSequence(10);
+        self::assertSame($delays['delay'], $delays['delayInMs']);
+
+        // fixed - in microseconds
+        $backoff = BackoffStrategy::fixedUs(5);
+        $delays = $backoff->generateTestSequence(10);
+        self::assertSame($delays['delay'], $delays['delayInUs']);
 
 
 
         // linear
         $backoff = BackoffStrategy::linear(5);
-        self::assertSame([5, 10, 15, 20, 25], $backoff->generateTestSequence(5)['delay']);
+        self::assertSame([5, 10, 15, 20], $backoff->generateTestSequence(10)['delay']);
 
         $backoff = BackoffStrategy::linear(5, 10);
-        self::assertSame([5, 15, 25, 35, 45], $backoff->generateTestSequence(5)['delay']);
+        self::assertSame([5, 15, 25, 35], $backoff->generateTestSequence(10)['delay']);
+
+        // linear - in milliseconds
+        $backoff = BackoffStrategy::linearMs(5);
+        $delays = $backoff->generateTestSequence(10);
+        self::assertSame([5, 10, 15, 20], $delays['delayInMs']);
+        self::assertSame($delays['delay'], $delays['delayInMs']);
+
+        // linear - in microseconds
+        $backoff = BackoffStrategy::linearUs(5);
+        $delays = $backoff->generateTestSequence(10);
+        self::assertSame([5, 10, 15, 20], $delays['delayInUs']);
+        self::assertSame($delays['delay'], $delays['delayInUs']);
 
 
 
         // exponential
         $backoff = BackoffStrategy::exponential(1);
-        self::assertSame([1, 2, 4, 8, 16], $backoff->generateTestSequence(5)['delay']);
+        self::assertSame([1, 2, 4, 8], $backoff->generateTestSequence(10)['delay']);
 
         $backoff = BackoffStrategy::exponential(1, 1.5);
-        self::assertSame([1.0, 1.5, 2.25, 3.375, 5.0625], $backoff->generateTestSequence(5)['delay']);
+        self::assertSame([1.0, 1.5, 2.25, 3.375], $backoff->generateTestSequence(10)['delay']);
+
+        // exponential - in milliseconds
+        $backoff = BackoffStrategy::exponentialMs(1);
+        $delays = $backoff->generateTestSequence(10);
+        self::assertSame([1, 2, 4, 8], $delays['delayInMs']);
+        self::assertSame($delays['delay'], $delays['delayInMs']);
+
+        // exponential - in microseconds
+        $backoff = BackoffStrategy::exponentialUs(1);
+        $delays = $backoff->generateTestSequence(10);
+        self::assertSame([1, 2, 4, 8], $delays['delayInUs']);
+        self::assertSame($delays['delay'], $delays['delayInUs']);
 
 
 
         // polynomial
         $backoff = BackoffStrategy::polynomial(1);
-        self::assertSame(
-            [1, 4, 9, 16, 25],
-            $backoff->generateTestSequence(5)['delay']
-        );
+        self::assertSame([1, 4, 9, 16], $backoff->generateTestSequence(10)['delay']);
 
         $backoff = BackoffStrategy::polynomial(1, 1.5);
         self::assertSame(
-            [1.0, 2.8284271247461903, 5.196152422706632, 8.0, 11.180339887498949],
-            $backoff->generateTestSequence(5)['delay']
+            [1.0, 2.8284271247461903, 5.196152422706632, 8.0],
+            $backoff->generateTestSequence(10)['delay']
         );
+
+        // polynomial - in milliseconds
+        $backoff = BackoffStrategy::polynomialMs(1);
+        $delays = $backoff->generateTestSequence(10);
+        self::assertSame([1, 4, 9, 16], $delays['delayInMs']);
+        self::assertSame($delays['delay'], $delays['delayInMs']);
+
+        // polynomial - in microseconds
+        $backoff = BackoffStrategy::polynomialUs(1);
+        $delays = $backoff->generateTestSequence(10);
+        self::assertSame([1, 4, 9, 16], $delays['delayInUs']);
+        self::assertSame($delays['delay'], $delays['delayInUs']);
 
 
 
         // fibonacci
         $backoff = BackoffStrategy::fibonacci(1);
-        self::assertSame([1, 2, 3, 5, 8], $backoff->generateTestSequence(5)['delay']);
+        self::assertSame([1, 2, 3, 5], $backoff->generateTestSequence(10)['delay']);
 
         $backoff = BackoffStrategy::fibonacci(1, false);
-        self::assertSame([1, 2, 3, 5, 8], $backoff->generateTestSequence(5)['delay']);
+        self::assertSame([1, 2, 3, 5], $backoff->generateTestSequence(10)['delay']);
 
         $backoff = BackoffStrategy::fibonacci(1, true);
-        self::assertSame([1, 1, 2, 3, 5], $backoff->generateTestSequence(5)['delay']);
+        self::assertSame([1, 1, 2, 3], $backoff->generateTestSequence(10)['delay']);
+
+        // fibonacci - in milliseconds
+        $backoff = BackoffStrategy::fibonacciMs(1);
+        $delays = $backoff->generateTestSequence(10);
+        self::assertSame([1, 2, 3, 5], $delays['delayInMs']);
+        self::assertSame($delays['delay'], $delays['delayInMs']);
+
+        // fibonacci - in microseconds
+        $backoff = BackoffStrategy::fibonacciUs(1);
+        $delays = $backoff->generateTestSequence(10);
+        self::assertSame([1, 2, 3, 5], $delays['delayInUs']);
+        self::assertSame($delays['delay'], $delays['delayInUs']);
 
 
 
@@ -123,10 +178,27 @@ class BackoffStrategyUnitTest extends PHPUnitTestCase
         $initialDelay = 1;
         $multiplier = 3;
         $backoff = BackoffStrategy::decorrelated($initialDelay, $multiplier);
+
+        // check max-attempts first
+        self::assertCount(4, $backoff->generateTestSequence(10)['delay']);
+
+        $backoff->reset()->maxAttempts(null);
         foreach ($backoff->generateTestSequence(100)['delay'] as $delay) {
             // just test that it generates numbers, the BackoffAlgorithmUnitTest tests the actual values
             self::assertGreaterThanOrEqual($initialDelay, $delay);
         }
+
+        // decorrelated - in milliseconds
+        $backoff = BackoffStrategy::decorrelatedMs(1);
+        $delays = $backoff->generateTestSequence(10);
+//        self::assertSame([ ??? ], $delays['delayInMs']);
+        self::assertSame($delays['delay'], $delays['delayInMs']);
+
+        // decorrelated - in microseconds
+        $backoff = BackoffStrategy::decorrelatedUs(1);
+        $delays = $backoff->generateTestSequence(10);
+//        self::assertSame([ ??? ], $delays['delayInUs']);
+        self::assertSame($delays['delay'], $delays['delayInUs']);
 
 
 
@@ -134,10 +206,27 @@ class BackoffStrategyUnitTest extends PHPUnitTestCase
         $min = mt_rand(0, 100000);
         $max = mt_rand($min, $min + 10);
         $backoff = BackoffStrategy::random($min, $max);
+
+        // check max-attempts first
+        self::assertCount(4, $backoff->generateTestSequence(10)['delay']);
+
+        $backoff->reset()->maxAttempts(null);
         foreach ($backoff->generateTestSequence(100)['delay'] as $delay) {
             self::assertGreaterThanOrEqual($min, $delay);
             self::assertLessThanOrEqual($max, $delay);
         }
+
+        // random - in milliseconds
+        $backoff = BackoffStrategy::randomMs($min, $max);
+        $delays = $backoff->generateTestSequence(10);
+//        self::assertSame([ ??? ], $delays['delayInMs']);
+        self::assertSame($delays['delay'], $delays['delayInMs']);
+
+        // random - in microseconds
+        $backoff = BackoffStrategy::randomUs($min, $max);
+        $delays = $backoff->generateTestSequence(10);
+//        self::assertSame([ ??? ], $delays['delayInUs']);
+        self::assertSame($delays['delay'], $delays['delayInUs']);
 
 
 
@@ -145,26 +234,63 @@ class BackoffStrategyUnitTest extends PHPUnitTestCase
         $backoff = BackoffStrategy::sequence([9, 8, 7, 6, 5]);
         self::assertSame([9, 8, 7, 6, 5], $backoff->generateTestSequence(5)['delay']);
 
+        // sequence - in milliseconds
+        $backoff = BackoffStrategy::sequenceMs([9, 8, 7, 6, 5]);
+        $delays = $backoff->generateTestSequence(10);
+        self::assertSame([9, 8, 7, 6, 5], $delays['delayInMs']);
+        self::assertSame($delays['delay'], $delays['delayInMs']);
+
+        // sequence - in microseconds
+        $backoff = BackoffStrategy::sequenceUs([9, 8, 7, 6, 5]);
+        $delays = $backoff->generateTestSequence(10);
+        self::assertSame([9, 8, 7, 6, 5], $delays['delayInUs']);
+        self::assertSame($delays['delay'], $delays['delayInUs']);
+
 
 
         // callback
-        $callback = fn($retryNumber) => $retryNumber < 5
+        $callback = fn($retryNumber) => $retryNumber < 4
             ? $retryNumber
             : null;
         $backoff = BackoffStrategy::callback($callback);
-        self::assertSame([1, 2, 3, 4], $backoff->generateTestSequence(10)['delay']);
+        self::assertSame([1, 2, 3], $backoff->generateTestSequence(10)['delay']);
+
+        // callback - in milliseconds
+        $backoff = BackoffStrategy::callbackMs($callback);
+        $delays = $backoff->generateTestSequence(10);
+        self::assertSame([1, 2, 3], $delays['delayInMs']);
+        self::assertSame($delays['delay'], $delays['delayInMs']);
+
+        // callback - in microseconds
+        $backoff = BackoffStrategy::callbackUs($callback);
+        $delays = $backoff->generateTestSequence(10);
+        self::assertSame([1, 2, 3], $delays['delayInUs']);
+        self::assertSame($delays['delay'], $delays['delayInUs']);
 
 
 
         // custom
-        $backoff = BackoffStrategy::custom(new LinearBackoffAlgorithm(5, 10));
-        self::assertSame([5, 15, 25, 35, 45], $backoff->generateTestSequence(5)['delay']);
+        $algorithm = new LinearBackoffAlgorithm(5, 10);
+        $backoff = BackoffStrategy::custom($algorithm);
+        self::assertSame([5, 15, 25, 35], $backoff->generateTestSequence(5)['delay']);
+
+        // custom - in milliseconds
+        $backoff = BackoffStrategy::customMs($algorithm);
+        $delays = $backoff->generateTestSequence(10);
+        self::assertSame([5, 15, 25, 35], $delays['delayInMs']);
+        self::assertSame($delays['delay'], $delays['delayInMs']);
+
+        // custom - in microseconds
+        $backoff = BackoffStrategy::customUs($algorithm);
+        $delays = $backoff->generateTestSequence(10);
+        self::assertSame([5, 15, 25, 35], $delays['delayInUs']);
+        self::assertSame($delays['delay'], $delays['delayInUs']);
 
 
 
         // noop
         $backoff = BackoffStrategy::noop();
-        self::assertSame([0, 0, 0, 0, 0], $backoff->generateTestSequence(5)['delay']);
+        self::assertSame([0, 0, 0, 0], $backoff->generateTestSequence(5)['delay']);
 
 
 
@@ -221,7 +347,7 @@ class BackoffStrategyUnitTest extends PHPUnitTestCase
         }
 
         // no jitter
-        $backoff = BackoffStrategy::fixed(4)->fullJitter()->noJitter();
+        $backoff = BackoffStrategy::fixed(4)->noMaxAttempts()->fullJitter()->noJitter();
         self::assertSame([4, 4, 4, 4, 4], $backoff->generateTestSequence(5)['delay']);
     }
 
@@ -321,11 +447,11 @@ class BackoffStrategyUnitTest extends PHPUnitTestCase
     public static function test_that_max_delay_can_be_set(): void
     {
         // max attempts
-        $backoff = BackoffStrategy::linear(1)->maxDelay(5);
+        $backoff = BackoffStrategy::linear(1)->noMaxAttempts()->maxDelay(5);
         self::assertSame([1, 2, 3, 4, 5, 5, 5, 5, 5, 5], $backoff->generateTestSequence(10)['delay']);
 
         // no max attempts
-        $backoff = BackoffStrategy::linear(1)->maxDelay(5)->noMaxDelay();
+        $backoff = BackoffStrategy::linear(1)->noMaxAttempts()->maxDelay(5)->noMaxDelay();
         self::assertSame([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], $backoff->generateTestSequence(10)['delay']);
     }
 
@@ -383,19 +509,19 @@ class BackoffStrategyUnitTest extends PHPUnitTestCase
     public static function test_that_the_initial_attempt_can_be_included(): void
     {
         // include the initial attempt
-        $backoff = BackoffStrategy::linear(1)->runsBeforeFirstAttempt();
+        $backoff = BackoffStrategy::linear(1)->noMaxAttempts()->runsBeforeFirstAttempt();
         self::assertSame([null, 1, 2, 3, 4, 5, 6, 7, 8, 9], $backoff->generateTestSequence(10)['delay']);
 
         // include the initial attempt
-        $backoff = BackoffStrategy::linear(1)->runsBeforeFirstAttempt(true);
+        $backoff = BackoffStrategy::linear(1)->noMaxAttempts()->runsBeforeFirstAttempt(true);
         self::assertSame([null, 1, 2, 3, 4, 5, 6, 7, 8, 9], $backoff->generateTestSequence(10)['delay']);
 
         // include the initial attempt
-        $backoff = BackoffStrategy::linear(1)->runsBeforeFirstAttempt(false);
+        $backoff = BackoffStrategy::linear(1)->noMaxAttempts()->runsBeforeFirstAttempt(false);
         self::assertSame([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], $backoff->generateTestSequence(10)['delay']);
 
         // don't include the initial attempt
-        $backoff = BackoffStrategy::linear(1)->runsBeforeFirstAttempt()->runsAfterFirstAttempt();
+        $backoff = BackoffStrategy::linear(1)->noMaxAttempts()->runsBeforeFirstAttempt()->runsAfterFirstAttempt();
         self::assertSame([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], $backoff->generateTestSequence(10)['delay']);
     }
 
@@ -411,19 +537,19 @@ class BackoffStrategyUnitTest extends PHPUnitTestCase
     public static function test_that_a_0_delay_can_be_inserted_as_the_first_delay(): void
     {
         // insert a 0 delay
-        $backoff = BackoffStrategy::linear(1)->immediateFirstRetry();
+        $backoff = BackoffStrategy::linear(1)->noMaxAttempts()->immediateFirstRetry();
         self::assertSame([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], $backoff->generateTestSequence(10)['delay']);
 
         // insert a 0 delay
-        $backoff = BackoffStrategy::linear(1)->immediateFirstRetry(true);
+        $backoff = BackoffStrategy::linear(1)->noMaxAttempts()->immediateFirstRetry(true);
         self::assertSame([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], $backoff->generateTestSequence(10)['delay']);
 
         // insert a 0 delay
-        $backoff = BackoffStrategy::linear(1)->immediateFirstRetry(false);
+        $backoff = BackoffStrategy::linear(1)->noMaxAttempts()->immediateFirstRetry(false);
         self::assertSame([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], $backoff->generateTestSequence(10)['delay']);
 
         // don't insert a 0 delay
-        $backoff = BackoffStrategy::linear(1)->immediateFirstRetry()->noImmediateFirstRetry();
+        $backoff = BackoffStrategy::linear(1)->noMaxAttempts()->immediateFirstRetry()->noImmediateFirstRetry();
         self::assertSame([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], $backoff->generateTestSequence(10)['delay']);
     }
 
@@ -439,15 +565,15 @@ class BackoffStrategyUnitTest extends PHPUnitTestCase
     public static function test_that_the_delay_can_be_enabled_and_disabled(): void
     {
         // enable the delay
-        $backoff = BackoffStrategy::linear(1)->onlyDelayWhen(true);
+        $backoff = BackoffStrategy::linear(1)->noMaxAttempts()->onlyDelayWhen(true);
         self::assertSame([1, 2, 3, 4, 5], $backoff->generateTestSequence(5)['delay']);
 
         // disable the delay
-        $backoff = BackoffStrategy::linear(1)->onlyDelayWhen(false);
+        $backoff = BackoffStrategy::linear(1)->noMaxAttempts()->onlyDelayWhen(false);
         self::assertSame([0, 0, 0, 0, 0], $backoff->generateTestSequence(5)['delay']);
 
         // disable then re-enable the delay
-        $backoff = BackoffStrategy::linear(1)->onlyDelayWhen(false)->onlyDelayWhen(true);
+        $backoff = BackoffStrategy::linear(1)->noMaxAttempts()->onlyDelayWhen(false)->onlyDelayWhen(true);
         self::assertSame([1, 2, 3, 4, 5], $backoff->generateTestSequence(5)['delay']);
     }
 
@@ -463,15 +589,15 @@ class BackoffStrategyUnitTest extends PHPUnitTestCase
     public static function test_that_retries_can_be_enabled_and_disabled(): void
     {
         // enable retries
-        $backoff = BackoffStrategy::linear(1)->onlyRetryWhen(true);
+        $backoff = BackoffStrategy::linear(1)->noMaxAttempts()->onlyRetryWhen(true);
         self::assertSame([1, 2, 3, 4, 5], $backoff->generateTestSequence(5)['delay']);
 
         // disable retries
-        $backoff = BackoffStrategy::linear(1)->onlyRetryWhen(false);
+        $backoff = BackoffStrategy::linear(1)->noMaxAttempts()->onlyRetryWhen(false);
         self::assertSame([], $backoff->generateTestSequence(5)['delay']);
 
         // disable then re-enable retries
-        $backoff = BackoffStrategy::linear(1)->onlyRetryWhen(false)->onlyRetryWhen(true);
+        $backoff = BackoffStrategy::linear(1)->noMaxAttempts()->onlyRetryWhen(false)->onlyRetryWhen(true);
         self::assertSame([1, 2, 3, 4, 5], $backoff->generateTestSequence(5)['delay']);
     }
 

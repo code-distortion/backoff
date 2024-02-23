@@ -4,17 +4,17 @@ namespace CodeDistortion\Backoff\Tests\Unit;
 
 use CodeDistortion\Backoff\Exceptions\BackoffInitialisationException;
 use CodeDistortion\Backoff\Exceptions\BackoffRuntimeException;
-use CodeDistortion\Backoff\Strategies\CallbackBackoffAlgorithm;
-use CodeDistortion\Backoff\Strategies\DecorrelatedBackoffAlgorithm;
-use CodeDistortion\Backoff\Strategies\ExponentialBackoffAlgorithm;
-use CodeDistortion\Backoff\Strategies\FibonacciBackoffAlgorithm;
-use CodeDistortion\Backoff\Strategies\FixedBackoffAlgorithm;
-use CodeDistortion\Backoff\Strategies\LinearBackoffAlgorithm;
-use CodeDistortion\Backoff\Strategies\NoBackoffAlgorithm;
-use CodeDistortion\Backoff\Strategies\NoopBackoffAlgorithm;
-use CodeDistortion\Backoff\Strategies\PolynomialBackoffAlgorithm;
-use CodeDistortion\Backoff\Strategies\RandomBackoffAlgorithm;
-use CodeDistortion\Backoff\Strategies\SequenceBackoffAlgorithm;
+use CodeDistortion\Backoff\Algorithms\CallbackBackoffAlgorithm;
+use CodeDistortion\Backoff\Algorithms\DecorrelatedBackoffAlgorithm;
+use CodeDistortion\Backoff\Algorithms\ExponentialBackoffAlgorithm;
+use CodeDistortion\Backoff\Algorithms\FibonacciBackoffAlgorithm;
+use CodeDistortion\Backoff\Algorithms\FixedBackoffAlgorithm;
+use CodeDistortion\Backoff\Algorithms\LinearBackoffAlgorithm;
+use CodeDistortion\Backoff\Algorithms\NoBackoffAlgorithm;
+use CodeDistortion\Backoff\Algorithms\NoopBackoffAlgorithm;
+use CodeDistortion\Backoff\Algorithms\PolynomialBackoffAlgorithm;
+use CodeDistortion\Backoff\Algorithms\RandomBackoffAlgorithm;
+use CodeDistortion\Backoff\Algorithms\SequenceBackoffAlgorithm;
 use CodeDistortion\Backoff\Support\BackoffAlgorithmInterface;
 use CodeDistortion\Backoff\Support\BaseBackoffAlgorithm;
 use CodeDistortion\Backoff\Tests\PHPUnitTestCase;
@@ -480,6 +480,7 @@ class BackoffAlgorithmUnitTest extends PHPUnitTestCase
     public function test_that_random_backoff_throws_exceptions(): void
     {
         $this->expectException(BackoffInitialisationException::class);
+
         new RandomBackoffAlgorithm(1, 0);
     }
 
@@ -495,8 +496,9 @@ class BackoffAlgorithmUnitTest extends PHPUnitTestCase
      */
     public function test_that_custom_backoff_throws_exceptions(): void
     {
-        $algorithm = new CallbackBackoffAlgorithm(fn(int $retryCount) => 'not a number');
         $this->expectException(BackoffRuntimeException::class);
+
+        $algorithm = new CallbackBackoffAlgorithm(fn(int $retryCount) => 'not a number');
         $algorithm->calculateBaseDelay(1, null);
     }
 }

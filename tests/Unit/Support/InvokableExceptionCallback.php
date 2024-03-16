@@ -2,20 +2,34 @@
 
 namespace CodeDistortion\Backoff\Tests\Unit\Support;
 
-use Throwable;
-
 /**
  * An invokable class that can be used as a callback for the Backoff class.
  */
 class InvokableExceptionCallback
 {
+    /** @var integer A count of how many times __invoke() is called. */
+    private int $count = 0;
+
+
+
     /**
      * Allow this class to be called as a function by the Backoff class.
      *
-     * @param Throwable $e The exception that was thrown.
+     * @param mixed $e The exception that was thrown, or the invalid result that was returned.
      * @return void
      */
-    public function __invoke(Throwable $e): void
+    public function __invoke(mixed $e): void
     {
+        $this->count++;
+    }
+
+    /**
+     * Get the count of how many times __invoke() has been called.
+     *
+     * @return integer
+     */
+    public function getCount(): int
+    {
+        return $this->count;
     }
 }

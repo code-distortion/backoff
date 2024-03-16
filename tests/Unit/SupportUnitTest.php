@@ -138,7 +138,7 @@ class SupportUnitTest extends PHPUnitTestCase
     public static function timespanConversionProvider(): array
     {
         $return = [];
-        foreach ([null, 0.000_001, 0.001, 0, 1, 1000, 1_000_000] as $timespan) {
+        foreach ([null, 0.000_001, 0.001, 0.0, 1.0, 1000.0, 1_000_000.0] as $timespan) {
             foreach (Settings::ALL_UNIT_TYPES as $currentUnitType) {
 
                 // disregard timespans that are too small to matter
@@ -162,7 +162,7 @@ class SupportUnitTest extends PHPUnitTestCase
 
                             case Settings::UNIT_MICROSECONDS:
                                 $multiplier = match ($desiredUnitType) {
-                                    Settings::UNIT_MICROSECONDS => 1,
+                                    Settings::UNIT_MICROSECONDS => 1.0,
                                     Settings::UNIT_MILLISECONDS => 0.001,
                                     default => 0.000_001, // Settings::UNIT_SECONDS
                                 };
@@ -171,7 +171,7 @@ class SupportUnitTest extends PHPUnitTestCase
                             case Settings::UNIT_MILLISECONDS:
                                 $multiplier = match ($desiredUnitType) {
                                     Settings::UNIT_MICROSECONDS => 1_000,
-                                    Settings::UNIT_MILLISECONDS => 1,
+                                    Settings::UNIT_MILLISECONDS => 1.0,
                                     default => 0.001, // Settings::UNIT_SECONDS
                                 };
                                 break;
@@ -180,22 +180,12 @@ class SupportUnitTest extends PHPUnitTestCase
                                 $multiplier = match ($desiredUnitType) {
                                     Settings::UNIT_MICROSECONDS => 1_000_000,
                                     Settings::UNIT_MILLISECONDS => 1_000,
-                                    default => 1, // Settings::UNIT_SECONDS
+                                    default => 1.0, // Settings::UNIT_SECONDS
                                 };
                                 break;
                         }
 
                         $expected = $timespan * $multiplier;
-
-                        $expected = ($desiredUnitType == Settings::UNIT_SECONDS)
-                            ? $expected
-                            : intval(round($expected));
-
-                        if ($desiredUnitType == Settings::UNIT_SECONDS) {
-                            if ($expected - floor($expected) == 0) {
-                                $expected = (int) $expected;
-                            }
-                        }
                     }
 
                     $return[] = [$timespan, $currentUnitType, $desiredUnitType, $expected];

@@ -1,9 +1,11 @@
 <?php
 
-namespace CodeDistortion\Backoff\Support;
+namespace CodeDistortion\Backoff\Interfaces\todo;
 
 use CodeDistortion\Backoff\AttemptLog;
 use CodeDistortion\Backoff\Exceptions\BackoffInitialisationException;
+use CodeDistortion\Backoff\Interfaces\BackoffAlgorithmInterface;
+use CodeDistortion\Backoff\Interfaces\JitterInterface;
 use CodeDistortion\Backoff\Settings;
 
 /**
@@ -14,18 +16,18 @@ interface BackoffStrategyInterface
     /**
      * Constructor
      *
-     * @param BackoffAlgorithmInterface $backoffAlgorithm       The backoff algorithm to use.
-     * @param JitterInterface|null      $jitter                 The jitter to apply (default: no jitter).
-     * @param integer|null              $maxAttempts            The maximum number of attempts to allow - null for
-     *                                                          infinite (default: null).
-     * @param integer|float|null        $maxDelay               The maximum delay to allow (optional).
-     * @param string|null               $unitType               The unit type to use
-     *                                                          (from Settings::UNIT_XXX, default: seconds).
-     * @param boolean                   $runsBeforeFirstAttempt Whether the backoff strategy should start with the first
-     *                                                          attempt, meaning no initial delay.
-     * @param boolean                   $immediateFirstRetry    Whether to insert a 0 delay as the first retry delay.
-     * @param boolean                   $delaysEnabled          Whether delays are allowed or not.
-     * @param boolean                   $retriesEnabled         Whether retries are allowed or not.
+     * @param BackoffAlgorithmInterface $backoffAlgorithm    The backoff algorithm to use.
+     * @param JitterInterface|null      $jitter              The jitter to apply (default: no jitter).
+     * @param integer|null              $maxAttempts         The maximum number of attempts to allow - null for infinite
+     *                                                       (default: null).
+     * @param integer|float|null        $maxDelay            The maximum delay to allow (optional).
+     * @param string|null               $unitType            The unit type to use
+     *                                                       (from Settings::UNIT_XXX, default: seconds).
+     * @param boolean                   $runsAtStartOfLoop   Whether the backoff strategy will be called before the
+     *                                                       first attempt is actually made or not.
+     * @param boolean                   $immediateFirstRetry Whether to insert a 0 delay as the first retry delay.
+     * @param boolean                   $delaysEnabled       Whether delays are allowed or not.
+     * @param boolean                   $retriesEnabled      Whether retries are allowed or not.
      * @throws BackoffInitialisationException When $unitType is invalid.
      */
     public function __construct(
@@ -34,7 +36,7 @@ interface BackoffStrategyInterface
         ?int $maxAttempts = null,
         int|float|null $maxDelay = null,
         ?string $unitType = Settings::UNIT_SECONDS,
-        bool $runsBeforeFirstAttempt = false,
+        bool $runsAtStartOfLoop = false,
         bool $immediateFirstRetry = false,
         bool $delaysEnabled = true,
         bool $retriesEnabled = true,
@@ -69,7 +71,7 @@ interface BackoffStrategyInterface
      *
      * @return boolean
      */
-    public function performBackoffLogic(): bool;
+    public function calculate(): bool;
 
 
 
@@ -96,7 +98,7 @@ interface BackoffStrategyInterface
      *
      * @return AttemptLog|null
      */
-    public function latestLog(): ?AttemptLog;
+    public function currentLog(): ?AttemptLog;
 
     /**
      * Retrieve all of the AttemptLog logs.
@@ -114,7 +116,7 @@ interface BackoffStrategyInterface
      *
      * @return integer
      */
-    public function getAttemptNumber(): int;
+    public function currentAttemptNumber(): int;
 
 
 

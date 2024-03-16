@@ -3,11 +3,11 @@
 namespace CodeDistortion\Backoff\Tests\Unit;
 
 use CodeDistortion\Backoff\Exceptions\BackoffInitialisationException;
+use CodeDistortion\Backoff\Interfaces\JitterInterface;
 use CodeDistortion\Backoff\Jitter\CallbackJitter;
-use CodeDistortion\Backoff\Jitter\RangeJitter;
-use CodeDistortion\Backoff\Jitter\FullJitter;
 use CodeDistortion\Backoff\Jitter\EqualJitter;
-use CodeDistortion\Backoff\Support\JitterInterface;
+use CodeDistortion\Backoff\Jitter\FullJitter;
+use CodeDistortion\Backoff\Jitter\RangeJitter;
 use CodeDistortion\Backoff\Tests\PHPUnitTestCase;
 
 /**
@@ -18,7 +18,7 @@ use CodeDistortion\Backoff\Tests\PHPUnitTestCase;
 class JitterUnitTest extends PHPUnitTestCase
 {
     /**
-     * Test the CallbackJitter class.
+     * Test the RangeJitter class.
      *
      * @test
      *
@@ -31,7 +31,7 @@ class JitterUnitTest extends PHPUnitTestCase
         $jitter = new RangeJitter($min, $max);
 
         for ($count = 0; $count < 100; $count++) {
-            $delay = $jitter->apply(1);
+            $delay = $jitter->apply(1, 99);
             self::assertGreaterThanOrEqual($min, $delay);
             self::assertLessThanOrEqual($max, $delay);
         }
@@ -46,75 +46,111 @@ class JitterUnitTest extends PHPUnitTestCase
      */
     public static function test_callback_jitter(): void
     {
-        // int return
-        $callback = fn($delay) => $delay + 1;
+        // test that delay is passed
+        $callback = fn($delay, $retryNumber) => $delay + 1;
         $jitter = new CallbackJitter($callback);
-        self::assertEquals(2, $jitter->apply(1));
-        self::assertEquals(3, $jitter->apply(2));
-        self::assertEquals(4, $jitter->apply(3));
+
+        self::assertEquals(2, $jitter->apply(1, 10));
+        self::assertEquals(3, $jitter->apply(2, 11));
+        self::assertEquals(4, $jitter->apply(3, 12));
+
+        // test that retry-number is passed
+        $callback = fn($delay, $retryNumber) => $retryNumber + 1;
+        $jitter = new CallbackJitter($callback);
+        self::assertEquals(11, $jitter->apply(1, 10));
+        self::assertEquals(12, $jitter->apply(2, 11));
+        self::assertEquals(13, $jitter->apply(3, 12));
+
+        // int return
+        $callback = fn($delay, $retryNumber) => $delay + 1;
+        $jitter = new CallbackJitter($callback);
+        self::assertEquals(2, $jitter->apply(1, 10));
+        self::assertEquals(3, $jitter->apply(2, 11));
+        self::assertEquals(4, $jitter->apply(3, 12));
 
         // float return
-        $callback = fn($delay) => $delay + 0.1;
+        $callback = fn($delay, $retryNumber) => $delay + 0.1;
         $jitter = new CallbackJitter($callback);
-        self::assertEquals(1.1, $jitter->apply(1));
-        self::assertEquals(2.1, $jitter->apply(2));
-        self::assertEquals(3.1, $jitter->apply(3));
+        self::assertEquals(1.1, $jitter->apply(1.0, 10));
+        self::assertEquals(2.1, $jitter->apply(2.0, 11));
+        self::assertEquals(3.1, $jitter->apply(3.0, 12));
     }
 
+
+
     /**
-     * Test the range of responses that jitter returns.
+     * Check the range of responses the different jitter classes generate.
      *
      * @test
      *
      * @return void
      */
-    public static function test_jitter_ranges(): void
+    public static function test_the_range_of_responses_the_different_jitter_classes_generate(): void
     {
-        self::testJitterQuadrants(new RangeJitter(-1, -1), 0, 0);
-        self::testJitterQuadrants(new RangeJitter(-1, 0), 0, 0);
-        self::testJitterQuadrants(new RangeJitter(0, 0), 0, 0);
-        self::testJitterQuadrants(new RangeJitter(0, 0.25), 0, 1);
-        self::testJitterQuadrants(new RangeJitter(0.25, 0.5), 1, 2);
-        self::testJitterQuadrants(new RangeJitter(0.5, 0.75), 2, 3);
-        self::testJitterQuadrants(new RangeJitter(0.75, 1), 3, 4);
-        self::testJitterQuadrants(new RangeJitter(0, 1), 0, 4);
-        self::testJitterQuadrants(new RangeJitter(0.75, 1.25), 3, 5);
-        self::testJitterQuadrants(new RangeJitter(1, 2), 4, 8);
+        // lower bound is 0
+        self::testJitterResponses(new RangeJitter(-1, -1), 1, 0, 0);
+        self::testJitterResponses(new RangeJitter(-1, 0), 1, 0, 0);
+        self::testJitterResponses(new RangeJitter(0, 0), 1, 0, 0);
+        self::testJitterResponses(new RangeJitter(-1, 1), 1, 0, 1);
 
-        self::testJitterQuadrants(new FullJitter(), 0, 4);
+        // ranges above 0
+        self::testJitterResponses(new RangeJitter(0, 0.25), 1, 0, 0.25);
+        self::testJitterResponses(new RangeJitter(0.25, 0.5), 1, 0.25, 0.5);
+        self::testJitterResponses(new RangeJitter(0.5, 0.75), 1, 0.5, 0.75);
+        self::testJitterResponses(new RangeJitter(0.75, 1), 1, 0.75, 1);
+        self::testJitterResponses(new RangeJitter(0, 1), 1, 0, 1);
+        self::testJitterResponses(new RangeJitter(0.75, 1.25), 1, 0.75, 1.25);
+        self::testJitterResponses(new RangeJitter(1, 2), 1, 1, 2);
 
-        self::testJitterQuadrants(new EqualJitter(), 2, 4);
+        // float delay
+        self::testJitterResponses(new RangeJitter(1, 2), 0.5, 0.5, 1);
+
+        // larger delay
+        self::testJitterResponses(new RangeJitter(1, 2), 100, 100, 200);
+
+        // full jitter
+        self::testJitterResponses(new FullJitter(), 1, 0, 1);
+        self::testJitterResponses(new FullJitter(), 100, 0, 100);
+
+        // equal jitter
+        self::testJitterResponses(new EqualJitter(), 1, 0.5, 1);
+        self::testJitterResponses(new EqualJitter(), 100, 50, 100);
     }
 
     /**
-     * Check which quadrants the jitter falls into.
-     *
-     * This queries the jitter instance many times, and logs the quartiles (compared to the input) the results fall
-     * into.
+     * Consult a jitter instance many times to become more sure the responses are within the expected range.
      *
      * @param JitterInterface $jitter      The jitter instance to test.
-     * @param integer         $expectedMin The minimum value that should be found.
-     * @param integer         $expectedMax The maximum value that should be found.
+     * @param integer|float   $delay       The delay to apply the jitter to.
+     * @param integer|float   $expectedMin The minimum value that should be found.
+     * @param integer|float   $expectedMax The maximum value that should be found.
      * @return void
      */
-    private static function testJitterQuadrants(JitterInterface $jitter, int $expectedMin, int $expectedMax): void
-    {
+    private static function testJitterResponses(
+        JitterInterface $jitter,
+        int|float $delay,
+        int|float $expectedMin,
+        int|float $expectedMax
+    ): void {
+
         for ($count = 0; $count < 100; $count++) {
-            $delay = $jitter->apply(4);
-            self::assertGreaterThanOrEqual($expectedMin, $delay);
-            self::assertLessThanOrEqual($expectedMax, $delay);
+            $jitteredDelay = $jitter->apply($delay, 99);
+            self::assertGreaterThanOrEqual($expectedMin, $jitteredDelay);
+            self::assertLessThanOrEqual($expectedMax, $jitteredDelay);
         }
     }
 
+
+
     /**
-     * Test that Jitter throws exceptions when needed.
+     * Test that RangeJitter throws an exception when max is less than min.
      *
      * @test
      *
      * @return void
      * @throws BackoffInitialisationException This will always be thrown.
      */
-    public function test_that_custom_jitter_throws_exceptions(): void
+    public function test_that_range_jitter_throws_exception_when_max_is_less_than_min(): void
     {
         $this->expectException(BackoffInitialisationException::class);
 
@@ -122,14 +158,14 @@ class JitterUnitTest extends PHPUnitTestCase
     }
 
     /**
-     * Test that Jitter throws exceptions when needed.
+     * Test that RangeJitter throws an exception when max is less than min.
      *
      * @test
      *
      * @return void
      * @throws BackoffInitialisationException This will always be thrown.
      */
-    public function test_that_custom_jitter_throws_exceptions2(): void
+    public function test_that_range_jitter_throws_exception_when_max_is_less_than_min2(): void
     {
         $this->expectException(BackoffInitialisationException::class);
 

@@ -2,6 +2,8 @@
 
 namespace CodeDistortion\Backoff\Support;
 
+use CodeDistortion\Backoff\Interfaces\JitterInterface;
+
 /**
  * Abstract jitter class.
  */
@@ -20,10 +22,11 @@ abstract class BaseJitter implements JitterInterface
      *
      * Note: This is intended to run in a stateless way, only using $delay and its settings to work out the delay.
      *
-     * @param integer|float $delay The delay to apply jitter to.
+     * @param integer|float $delay       The delay to apply jitter to.
+     * @param integer       $retryNumber The retry being attempted.
      * @return integer|float
      */
-    public function apply(int|float $delay): int|float
+    public function apply(int|float $delay, int $retryNumber): int|float
     {
         return Support::randFloat(
             $this->min * $delay,

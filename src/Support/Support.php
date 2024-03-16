@@ -55,25 +55,25 @@ abstract class Support
             return null;
         }
 
+        if ($desiredUnitType == $currentUnitType) {
+            return $delay;
+        }
+
         switch ($desiredUnitType) {
 
             case Settings::UNIT_MICROSECONDS:
-                $microseconds = match ($currentUnitType) {
+                return match ($currentUnitType) {
                     Settings::UNIT_MICROSECONDS => $delay,
                     Settings::UNIT_MILLISECONDS => $delay * 1_000,
                     default => $delay * 1_000_000,
                 };
-                // milliseconds are whole numbers - int
-                return intval(round($microseconds));
 
             case Settings::UNIT_MILLISECONDS:
-                $milliseconds = match ($currentUnitType) {
+                return match ($currentUnitType) {
                     Settings::UNIT_MICROSECONDS => $delay / 1_000,
                     Settings::UNIT_MILLISECONDS => $delay,
                     default => $delay * 1_000,
                 };
-                // milliseconds are whole numbers - int
-                return intval(round($milliseconds));
 
             default: // Settings::UNIT_SECONDS
                 return match ($currentUnitType) {
@@ -83,6 +83,7 @@ abstract class Support
                 };
         }
     }
+
 
 
     /**
@@ -103,7 +104,7 @@ abstract class Support
         $diffInUs = $microseconds2 - $microseconds1;
 
         // convert difference in microseconds to seconds and add to total seconds difference
-        return $diffInSeconds + ($diffInUs / 1000000);
+        return $diffInSeconds + ($diffInUs / 1_000_000);
     }
 
     /**
@@ -120,11 +121,11 @@ abstract class Support
         $returnArgs = [];
         foreach ($parameters as $parameter) {
 
-            $isArray = is_array($parameter) && (!$checkForCallable || !is_callable($parameter));
+            $isPlainArray = is_array($parameter) && (!$checkForCallable || !is_callable($parameter));
 
             $returnArgs = array_merge(
                 $returnArgs,
-                $isArray ? $parameter : [$parameter]
+                $isPlainArray ? $parameter : [$parameter]
             );
         }
 

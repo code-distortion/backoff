@@ -1,13 +1,7 @@
 <?php
 
-namespace CodeDistortion\Backoff;
+namespace CodeDistortion\Backoff\Traits;
 
-use CodeDistortion\Backoff\Exceptions\BackoffInitialisationException;
-use CodeDistortion\Backoff\Exceptions\BackoffRuntimeException;
-use CodeDistortion\Backoff\Jitter\CallbackJitter;
-use CodeDistortion\Backoff\Jitter\EqualJitter;
-use CodeDistortion\Backoff\Jitter\FullJitter;
-use CodeDistortion\Backoff\Jitter\RangeJitter;
 use CodeDistortion\Backoff\Algorithms\CallbackBackoffAlgorithm;
 use CodeDistortion\Backoff\Algorithms\DecorrelatedBackoffAlgorithm;
 use CodeDistortion\Backoff\Algorithms\ExponentialBackoffAlgorithm;
@@ -19,71 +13,27 @@ use CodeDistortion\Backoff\Algorithms\NoopBackoffAlgorithm;
 use CodeDistortion\Backoff\Algorithms\PolynomialBackoffAlgorithm;
 use CodeDistortion\Backoff\Algorithms\RandomBackoffAlgorithm;
 use CodeDistortion\Backoff\Algorithms\SequenceBackoffAlgorithm;
-use CodeDistortion\Backoff\Support\BackoffStrategyInterface;
-use CodeDistortion\Backoff\Support\BackoffAlgorithmInterface;
-use CodeDistortion\Backoff\Support\BaseBackoffStrategy;
-use CodeDistortion\Backoff\Support\JitterInterface;
+use CodeDistortion\Backoff\Exceptions\BackoffInitialisationException;
+use CodeDistortion\Backoff\Exceptions\BackoffRuntimeException;
+use CodeDistortion\Backoff\Interfaces\BackoffAlgorithmInterface;
+use CodeDistortion\Backoff\Interfaces\JitterInterface;
+use CodeDistortion\Backoff\Jitter\CallbackJitter;
+use CodeDistortion\Backoff\Jitter\EqualJitter;
+use CodeDistortion\Backoff\Jitter\FullJitter;
+use CodeDistortion\Backoff\Jitter\RangeJitter;
+use CodeDistortion\Backoff\Settings;
 
 /**
- * Class that implements a backoff strategy.
- *
- * The parent class is Support/BaseBackoffStrategy implements the main logic.
- *
- * This class adds methods to assist with instantiation and configuration.
+ * Adds methods to assist with instantiation and configuration of a backoff-strategy.
  */
-class BackoffStrategy extends BaseBackoffStrategy
+trait BackoffDecoratorTrait
 {
-    /** @var integer The default maximum number of attempts to make. */
-    public static int $defaultMaxAttempts = 5;
+    use BackoffStrategyTrait;
 
 
 
-    // instantiation methods
-
-    /**
-     * Alternative constructor.
-     *
-     * @param BackoffAlgorithmInterface $backoffAlgorithm       The backoff algorithm to use.
-     * @param JitterInterface|null      $jitter                 The jitter to apply (default: no jitter).
-     * @param integer|null              $maxAttempts            The maximum number of attempts to allow - null for
-     *                                                          infinite (default: null).
-     * @param integer|float|null        $maxDelay               The maximum delay to allow (optional).
-     * @param string|null               $unitType               The unit type to use
-     *                                                          (from Settings::UNIT_XXX, default: seconds).
-     * @param boolean                   $runsBeforeFirstAttempt Whether the backoff strategy should start with the first
-     *                                                          attempt, meaning no initial delay.
-     * @param boolean                   $immediateFirstRetry    Whether to insert a 0 delay as the first retry delay.
-     * @param boolean                   $delaysEnabled          Whether delays are allowed or not.
-     * @param boolean                   $retriesEnabled         Whether retries are allowed or not.
-     * @return self
-     * @throws BackoffInitialisationException When an invalid $unitType is specified.
-     */
-    public static function new(
-        BackoffAlgorithmInterface $backoffAlgorithm,
-        ?JitterInterface $jitter = null,
-        ?int $maxAttempts = null,
-        int|float|null $maxDelay = null,
-        ?string $unitType = Settings::UNIT_SECONDS,
-        bool $runsBeforeFirstAttempt = false,
-        bool $immediateFirstRetry = false,
-        bool $delaysEnabled = true,
-        bool $retriesEnabled = true,
-    ): static {
-
-        return new static(
-            $backoffAlgorithm,
-            $jitter,
-            $maxAttempts,
-            $maxDelay,
-            $unitType,
-            $runsBeforeFirstAttempt,
-            $immediateFirstRetry,
-            $delaysEnabled,
-            $retriesEnabled,
-        );
-    }
-
-
+    /** @var integer|null The default maximum number of attempts to make. */
+    private static ?int $defaultMaxAttempts = null;
 
 
 
@@ -98,7 +48,7 @@ class BackoffStrategy extends BaseBackoffStrategy
     public static function fixed(int|float $delay): static
     {
         $algorithm = new FixedBackoffAlgorithm($delay);
-        return static::new($algorithm)->maxAttempts(self::$defaultMaxAttempts);
+        return static::new($algorithm)->maxAttempts(self::$defaultMaxAttempts)->fullJitter();
     }
 
     /**
@@ -136,7 +86,7 @@ class BackoffStrategy extends BaseBackoffStrategy
     public static function linear(int|float $initialDelay, int|float|null $delayIncrease = null): static
     {
         $algorithm = new LinearBackoffAlgorithm($initialDelay, $delayIncrease);
-        return static::new($algorithm)->maxAttempts(self::$defaultMaxAttempts);
+        return static::new($algorithm)->maxAttempts(self::$defaultMaxAttempts)->fullJitter();
     }
 
     /**
@@ -175,7 +125,7 @@ class BackoffStrategy extends BaseBackoffStrategy
     public static function exponential(int|float $initialDelay, int|float $factor = 2): static
     {
         $algorithm = new ExponentialBackoffAlgorithm($initialDelay, $factor);
-        return static::new($algorithm)->maxAttempts(self::$defaultMaxAttempts);
+        return static::new($algorithm)->maxAttempts(self::$defaultMaxAttempts)->fullJitter();
     }
 
     /**
@@ -214,7 +164,7 @@ class BackoffStrategy extends BaseBackoffStrategy
     public static function polynomial(int|float $initialDelay, int|float $power = 2): static
     {
         $algorithm = new PolynomialBackoffAlgorithm($initialDelay, $power);
-        return static::new($algorithm)->maxAttempts(self::$defaultMaxAttempts);
+        return static::new($algorithm)->maxAttempts(self::$defaultMaxAttempts)->fullJitter();
     }
 
     /**
@@ -253,7 +203,7 @@ class BackoffStrategy extends BaseBackoffStrategy
     public static function fibonacci(int|float $initialDelay, bool $includeFirst = false): static
     {
         $algorithm = new FibonacciBackoffAlgorithm($initialDelay, $includeFirst);
-        return static::new($algorithm)->maxAttempts(self::$defaultMaxAttempts);
+        return static::new($algorithm)->maxAttempts(self::$defaultMaxAttempts)->fullJitter();
     }
 
     /**
@@ -366,35 +316,48 @@ class BackoffStrategy extends BaseBackoffStrategy
     /**
      * Create a new backoff strategy using the sequence backoff algorithm.
      *
-     * @param array<integer|float> $delays The sequence of delays to use.
+     * Note: default maxAttempts() is not set for sequence(), as it's assumed the sequence's length will be chosen to be
+     * the desired length.
+     *
+     * @param array<integer|float> $delays       The sequence of delays to use.
+     * @param integer|float|null   $continuation The delay to use (when present) after the sequence has been exhausted.
      * @return static
      */
-    public static function sequence(array $delays): static
+    public static function sequence(array $delays, int|float|null $continuation = null): static
     {
-        $algorithm = new SequenceBackoffAlgorithm($delays);
-        return static::new($algorithm);
+        $algorithm = new SequenceBackoffAlgorithm($delays, $continuation);
+        $strategy = static::new($algorithm);
+
+        // only apply max-attempts when a continuation value is present
+        // otherwise the sequence will be allowed to continue until the sequence is exhausted
+        if (!is_null($continuation)) {
+            $strategy->maxAttempts(self::$defaultMaxAttempts);
+        }
+        return $strategy;
     }
 
     /**
      * Create a new backoff strategy using the sequence backoff algorithm, in milliseconds.
      *
-     * @param array<integer> $delays The sequence of delays to use.
+     * @param array<integer> $delays       The sequence of delays to use.
+     * @param integer|null   $continuation The delay to use (when present) after the sequence has been exhausted.
      * @return static
      */
-    public static function sequenceMs(array $delays): static
+    public static function sequenceMs(array $delays, int|null $continuation = null): static
     {
-        return static::sequence($delays)->unitMs();
+        return static::sequence($delays, $continuation)->unitMs();
     }
 
     /**
      * Create a new backoff strategy using the sequence backoff algorithm, in microseconds.
      *
-     * @param array<integer> $delays The sequence of delays to use.
+     * @param array<integer> $delays       The sequence of delays to use.
+     * @param integer|null   $continuation The delay to use (when present) after the sequence has been exhausted.
      * @return static
      */
-    public static function sequenceUs(array $delays): static
+    public static function sequenceUs(array $delays, int|null $continuation = null): static
     {
-        return static::sequence($delays)->unitUs();
+        return static::sequence($delays, $continuation)->unitUs();
     }
 
 
@@ -408,7 +371,7 @@ class BackoffStrategy extends BaseBackoffStrategy
     public static function callback(callable $callback): static
     {
         $algorithm = new CallbackBackoffAlgorithm($callback);
-        return static::new($algorithm)->maxAttempts(self::$defaultMaxAttempts);
+        return static::new($algorithm)->maxAttempts(self::$defaultMaxAttempts)->fullJitter();
     }
 
     /**
@@ -443,7 +406,7 @@ class BackoffStrategy extends BaseBackoffStrategy
      */
     public static function custom(BackoffAlgorithmInterface $backoffAlgorithm): static
     {
-        return static::new($backoffAlgorithm)->maxAttempts(self::$defaultMaxAttempts);
+        return static::new($backoffAlgorithm)->maxAttempts(self::$defaultMaxAttempts)->fullJitter();
     }
 
     /**
@@ -478,7 +441,7 @@ class BackoffStrategy extends BaseBackoffStrategy
     public static function noop(): static
     {
         $algorithm = new NoopBackoffAlgorithm();
-        return static::new($algorithm)->maxAttempts(self::$defaultMaxAttempts);
+        return static::new($algorithm)->maxAttempts(self::$defaultMaxAttempts)->fullJitter();
     }
 
 
@@ -491,8 +454,7 @@ class BackoffStrategy extends BaseBackoffStrategy
     public static function none(): static
     {
         $algorithm = new NoBackoffAlgorithm();
-        // add maxAttempts just for good measure seeing it's known anyway
-        return static::new($algorithm)->maxAttempts(1);
+        return static::new($algorithm)->fullJitter();
     }
 
 
@@ -615,7 +577,7 @@ class BackoffStrategy extends BaseBackoffStrategy
     // configuration methods - max attempts
 
     /**
-     * Specify the maximum number of attempts to make.
+     * Specify the maximum number of attempts allowed.
      *
      * @param integer|null $maxAttempts The maximum number of attempts to make (null for no limit).
      * @return $this
@@ -628,15 +590,35 @@ class BackoffStrategy extends BaseBackoffStrategy
         }
 
         $this->maxAttempts = $maxAttempts;
-        $this->reassessInitialStoppedState();
+        $this->assessInitialStoppedState();
 
         return $this;
     }
 
     /**
-     * Specify that no maximum limit should be applied to the number of attempts to make.
+     * Specify that no limit should be applied to the number of attempts allowed.
      *
-     * todo - rename to (or add) unlimitedAttempts() ???
+     * @return $this
+     * @throws BackoffRuntimeException When the backoff process has already started.
+     */
+    public function noAttemptLimit(): static
+    {
+        if ($this->hasStarted()) {
+            throw BackoffRuntimeException::attemptToChangeAfterStart(__FUNCTION__);
+        }
+
+        $this->maxAttempts = null;
+        $this->assessInitialStoppedState();
+
+        return $this;
+    }
+
+    /**
+     * Specify that no limit should be applied to the number of attempts allowed.
+     *
+     * Alias for noAttemptLimit().
+     *
+     * @see noAttemptLimit()
      *
      * @return $this
      * @throws BackoffRuntimeException When the backoff process has already started.
@@ -648,7 +630,7 @@ class BackoffStrategy extends BaseBackoffStrategy
         }
 
         $this->maxAttempts = null;
-        $this->reassessInitialStoppedState();
+        $this->assessInitialStoppedState();
 
         return $this;
     }
@@ -678,9 +660,28 @@ class BackoffStrategy extends BaseBackoffStrategy
     }
 
     /**
-     * Specify that no maximum should be applied to the delay.
+     * Specify that no limit should be applied to the delay.
      *
-     * todo - rename to (or add) unlimitedDelay() ???
+     * @return $this
+     * @throws BackoffRuntimeException When the backoff process has already started.
+     */
+    public function noDelayLimit(): static
+    {
+        if ($this->hasStarted()) {
+            throw BackoffRuntimeException::attemptToChangeAfterStart(__FUNCTION__);
+        }
+
+        $this->maxDelay = null;
+
+        return $this;
+    }
+
+    /**
+     * Specify that no limit should be applied to the delay.
+     *
+     * Alias for noDelayLimit().
+     *
+     * @see noDelayLimit()
      *
      * @return $this
      * @throws BackoffRuntimeException When the backoff process has already started.
@@ -775,23 +776,23 @@ class BackoffStrategy extends BaseBackoffStrategy
 
 
 
-    // configuration methods - first attempt
+    // configuration methods - runs before / after loop
 
     /**
      * Start the sequence with the first ATTEMPT, meaning no delay is applied the first iteration.
      *
-     * @param boolean $before Whether the backoff strategy should start with the first attempt, meaning no initial
-     *                        delay.
+     * @param boolean $runsBefore Whether the backoff strategy should start with the first attempt, meaning no initial
+     *                            delay.
      * @return $this
      * @throws BackoffRuntimeException When the backoff process has already started.
      */
-    public function runsBeforeFirstAttempt(bool $before = true): static
+    public function runsAtStartOfLoop(bool $runsBefore = true): static
     {
         if ($this->hasStarted()) {
             throw BackoffRuntimeException::attemptToChangeAfterStart(__FUNCTION__);
         }
 
-        $this->runsBeforeFirstAttempt = $before;
+        $this->runsAtStartOfLoop = $runsBefore;
 
         return $this;
     }
@@ -802,13 +803,13 @@ class BackoffStrategy extends BaseBackoffStrategy
      * @return $this
      * @throws BackoffRuntimeException When the backoff process has already started.
      */
-    public function runsAfterFirstAttempt(): static
+    public function runsAtEndOfLoop(): static
     {
         if ($this->hasStarted()) {
             throw BackoffRuntimeException::attemptToChangeAfterStart(__FUNCTION__);
         }
 
-        $this->runsBeforeFirstAttempt = false;
+        $this->runsAtStartOfLoop = false;
 
         return $this;
     }
@@ -863,6 +864,7 @@ class BackoffStrategy extends BaseBackoffStrategy
     /**
      * Enable or disable the backoff delays - when disabled, retries will occur immediately.
      *
+     * @param boolean $condition Whether delays are allowed or not.
      * @return $this
      * @throws BackoffRuntimeException When the backoff process has already started.
      */
@@ -880,6 +882,7 @@ class BackoffStrategy extends BaseBackoffStrategy
     /**
      * Enable or disable the retries.
      *
+     * @param boolean $condition Whether retries are allowed or not.
      * @return $this
      * @throws BackoffRuntimeException When the backoff process has already started.
      */

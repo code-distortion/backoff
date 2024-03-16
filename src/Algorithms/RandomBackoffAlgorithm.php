@@ -3,8 +3,8 @@
 namespace CodeDistortion\Backoff\Algorithms;
 
 use CodeDistortion\Backoff\Exceptions\BackoffInitialisationException;
+use CodeDistortion\Backoff\Interfaces\BackoffAlgorithmInterface;
 use CodeDistortion\Backoff\Support\BaseBackoffAlgorithm;
-use CodeDistortion\Backoff\Support\BackoffAlgorithmInterface;
 use CodeDistortion\Backoff\Support\Support;
 
 /**
@@ -41,14 +41,14 @@ class RandomBackoffAlgorithm extends BaseBackoffAlgorithm implements BackoffAlgo
      *
      * $retryNumber starts at 1 and increases for each subsequent retry.
      *
-     * Note: This is intended to run in a stateless way, only using $retryNumber
+     * Note: This is intended to run in a stateless way, using only $retryNumber
      * and possibly $prevDelay to work out the next delay.
      *
-     * @param integer            $retryNumber The retry being attempted.
-     * @param integer|float|null $prevDelay   The previous delay used (if any).
+     * @param integer            $retryNumber   The retry being attempted.
+     * @param integer|float|null $prevBaseDelay The previous delay used (if any).
      * @return integer|float|null
      */
-    public function calculateBaseDelay(int $retryNumber, int|float|null $prevDelay): int|float|null
+    public function calculateBaseDelay(int $retryNumber, int|float|null $prevBaseDelay): int|float|null
     {
         return Support::randFloat(
             $this->minDelay,

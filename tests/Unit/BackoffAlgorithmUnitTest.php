@@ -2,8 +2,6 @@
 
 namespace CodeDistortion\Backoff\Tests\Unit;
 
-use CodeDistortion\Backoff\Exceptions\BackoffInitialisationException;
-use CodeDistortion\Backoff\Exceptions\BackoffRuntimeException;
 use CodeDistortion\Backoff\Algorithms\CallbackBackoffAlgorithm;
 use CodeDistortion\Backoff\Algorithms\DecorrelatedBackoffAlgorithm;
 use CodeDistortion\Backoff\Algorithms\ExponentialBackoffAlgorithm;
@@ -15,9 +13,12 @@ use CodeDistortion\Backoff\Algorithms\NoopBackoffAlgorithm;
 use CodeDistortion\Backoff\Algorithms\PolynomialBackoffAlgorithm;
 use CodeDistortion\Backoff\Algorithms\RandomBackoffAlgorithm;
 use CodeDistortion\Backoff\Algorithms\SequenceBackoffAlgorithm;
-use CodeDistortion\Backoff\Support\BackoffAlgorithmInterface;
+use CodeDistortion\Backoff\Exceptions\BackoffInitialisationException;
+use CodeDistortion\Backoff\Exceptions\BackoffRuntimeException;
+use CodeDistortion\Backoff\Interfaces\BackoffAlgorithmInterface;
 use CodeDistortion\Backoff\Support\BaseBackoffAlgorithm;
 use CodeDistortion\Backoff\Tests\PHPUnitTestCase;
+use stdClass;
 
 /**
  * Test the BackoffAlgorithm classes.
@@ -53,6 +54,10 @@ class BackoffAlgorithmUnitTest extends PHPUnitTestCase
         $integerCallback = fn(int $retryCount) => $retryCount * 10;
         $floatCallback = fn(int $retryCount) => $retryCount * 1.5;
         $nullCallback = fn(int $retryCount) => null;
+        $prevDelayCallback = fn(int $retryCount, int|float|null $prevBaseDelay) => $prevBaseDelay + 2;
+
+        // Note: that bounding (between 0 and max-delay), max-attempts, jitter and rounding
+        // to the nearest int for milliseconds and microseconds aren't tested here
 
         return [
 
@@ -114,6 +119,10 @@ class BackoffAlgorithmUnitTest extends PHPUnitTestCase
             [
                 fn() => new LinearBackoffAlgorithm(1, 0),
                 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            ],
+            [
+                fn() => new LinearBackoffAlgorithm(1, 1),
+                [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
             ],
             [
                 fn() => new LinearBackoffAlgorithm(1, 2),
@@ -207,6 +216,10 @@ class BackoffAlgorithmUnitTest extends PHPUnitTestCase
                 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
             ],
             [
+                fn() => new PolynomialBackoffAlgorithm(1, 1),
+                [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+            ],
+            [
                 fn() => new PolynomialBackoffAlgorithm(1, 2),
                 [1, 4, 9, 16, 25, 36, 49, 64, 81, 100],
             ],
@@ -285,7 +298,7 @@ class BackoffAlgorithmUnitTest extends PHPUnitTestCase
             ],
             [
                 fn() => new SequenceBackoffAlgorithm(
-                    [1, 10, 2, 9, 3, 8, 4, 7, 5, 6, 6, 5, 7, 4, 8, 3, 9, 2, 10, 1] // more than 10
+                    [1, 10, 2, 9, 3, 8, 4, 7, 5, 6, 6, 5, 7, 4, 8, 3, 9, 2, 10, 1] // more than 10 values
                 ),
                 [1, 10, 2, 9, 3, 8, 4, 7, 5, 6],
             ],
@@ -304,6 +317,10 @@ class BackoffAlgorithmUnitTest extends PHPUnitTestCase
             [
                 fn() => new CallbackBackoffAlgorithm($nullCallback),
                 [null, null, null, null, null, null, null, null, null, null],
+            ],
+            [
+                fn() => new CallbackBackoffAlgorithm($prevDelayCallback),
+                [2, 4, 6, 8, 10, 12, 14, 16, 18, 20],
             ],
 
 
@@ -334,7 +351,7 @@ class BackoffAlgorithmUnitTest extends PHPUnitTestCase
      * @param integer|float|null $multiplier The factor to multiply by each time.
      * @return void
      */
-    public function test_decorrelated_backoff_algorithm(int|float $baseDelay, int|float|null $multiplier): void
+    public static function test_decorrelated_backoff_algorithm(int|float $baseDelay, int|float|null $multiplier): void
     {
         $algorithm = !is_null($multiplier)
             ? new DecorrelatedBackoffAlgorithm($baseDelay, $multiplier)
@@ -342,13 +359,12 @@ class BackoffAlgorithmUnitTest extends PHPUnitTestCase
 
         $multiplier = $multiplier ?? 3; // multiplier default is 3
 
-        $delay = $baseDelay;
-        for ($retryNumber = 1; $retryNumber < 100; $retryNumber++) {
-            $prevDelay = $delay;
-            $delay = $algorithm->calculateBaseDelay($retryNumber, $prevDelay);
-
+        $prevDelay = $baseDelay;
+        foreach ($algorithm->generateTestSequence(100) as $delay) {
             self::assertGreaterThanOrEqual($baseDelay, $delay);
             self::assertLessThanOrEqual($prevDelay * $multiplier, $delay);
+
+            $prevDelay = $delay;
         }
     }
 
@@ -394,7 +410,7 @@ class BackoffAlgorithmUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
-    public function test_random_backoff_algorithm(): void
+    public static function test_random_backoff_algorithm(): void
     {
         $min = mt_rand(0, 100000);
         $max = mt_rand($min, $min + 10);
@@ -427,6 +443,8 @@ class BackoffAlgorithmUnitTest extends PHPUnitTestCase
         );
     }
 
+
+
     /**
      * Check to make sure the correct backoff strategies allow jitter.
      *
@@ -442,8 +460,6 @@ class BackoffAlgorithmUnitTest extends PHPUnitTestCase
 
         self::assertSame($expected, $algorithm->jitterMayBeApplied());
     }
-
-
 
     /**
      * DataProvider for test_which_backoff_strategies_allow_jitter.
@@ -470,14 +486,14 @@ class BackoffAlgorithmUnitTest extends PHPUnitTestCase
 
 
     /**
-     * Test that RandomBackoffAlgorithm throws exceptions when needed.
+     * Test that RandomBackoffAlgorithm throws an exception when max is less than min.
      *
      * @test
      *
      * @return void
      * @throws BackoffInitialisationException This will always be thrown.
      */
-    public function test_that_random_backoff_throws_exceptions(): void
+    public function test_that_random_backoff_throws_exception_when_max_is_less_than_min(): void
     {
         $this->expectException(BackoffInitialisationException::class);
 
@@ -487,18 +503,36 @@ class BackoffAlgorithmUnitTest extends PHPUnitTestCase
 
 
     /**
-     * Test that CallbackBackoffAlgorithm throws exceptions when needed.
+     * Test that CallbackBackoffAlgorithm throws exceptions when an invalid response is given.
      *
      * @test
+     * @dataProvider invalidCallbackReturnValueDataProvider
      *
+     * @param mixed $invalidReturnValue The invalid return value to test.
      * @return void
      * @throws BackoffRuntimeException This will always be thrown.
      */
-    public function test_that_custom_backoff_throws_exceptions(): void
+    public function test_that_custom_backoff_throws_exceptions(mixed $invalidReturnValue): void
     {
         $this->expectException(BackoffRuntimeException::class);
 
-        $algorithm = new CallbackBackoffAlgorithm(fn(int $retryCount) => 'not a number');
+        $algorithm = new CallbackBackoffAlgorithm(fn(int $retryCount) => $invalidReturnValue);
         $algorithm->calculateBaseDelay(1, null);
+    }
+
+    /**
+     * DataProvider for test_that_custom_backoff_throws_exceptions.
+     *
+     * @return array{array{'not a number'}, array{stdClass}, array{array{}}, array{true}, array{false}}
+     */
+    public static function invalidCallbackReturnValueDataProvider(): array
+    {
+        return [
+            ['not a number'],
+            [new stdClass()],
+            [[]],
+            [true],
+            [false],
+        ];
     }
 }

@@ -23,31 +23,38 @@ class AttemptLogUnitTest extends PHPUnitTestCase
      * @dataProvider attemptLogDataProvider
      *
      * @param integer            $attemptNumber          The number of attempts that have been made.
-     * @param integer|null       $maxPossibleAttempts    The total number attempts that could be made.
+     * @param integer|null       $maxAttempts            The total number attempts that could be made.
      * @param DateTime           $firstAttemptOccurredAt The time the first attempt occurred.
      * @param DateTime           $thisAttemptOccurredAt  The time this attempt occurred.
-     * @param integer|float|null $delay                  The most recently used delay.
      * @param integer|float|null $workingTime            The time spent attempting the action.
-     * @param integer|float|null $overallDelay           The overall delay (sum of all delays).
      * @param integer|float|null $overallWorkingTime     The overall time spent attempting the action.
+     * @param integer|float|null $prevDelay              The delay that was used before this attempt.
+     * @param integer|float|null $nextDelay              The delay that will occur next, before the next attempt.
+     * @param integer|float|null $overallDelay           The overall delay (sum of all delays - excluding the next
+     *                                                   delay).
      * @param string             $unitType               The unit type that delay and overall delay are in.
      * @return void
      */
     public static function test_backoff_attempt_dto(
         int $attemptNumber,
-        ?int $maxPossibleAttempts,
+        ?int $maxAttempts,
         DateTime $firstAttemptOccurredAt,
         DateTime $thisAttemptOccurredAt,
-        int|float|null $delay,
         int|float|null $workingTime,
-        int|float|null $overallDelay,
         int|float|null $overallWorkingTime,
+        int|float|null $prevDelay,
+        int|float|null $nextDelay,
+        int|float|null $overallDelay,
         string $unitType,
     ): void {
 
-        $delayInSeconds = Support::convertTimespan($delay, $unitType, Settings::UNIT_SECONDS);
-        $delayInMs = Support::convertTimespan($delay, $unitType, Settings::UNIT_MILLISECONDS);
-        $delayInUs = Support::convertTimespan($delay, $unitType, Settings::UNIT_MICROSECONDS);
+        $prevDelayInSeconds = Support::convertTimespan($prevDelay, $unitType, Settings::UNIT_SECONDS);
+        $prevDelayInMs = Support::convertTimespan($prevDelay, $unitType, Settings::UNIT_MILLISECONDS);
+        $prevDelayInUs = Support::convertTimespan($prevDelay, $unitType, Settings::UNIT_MICROSECONDS);
+
+        $nextDelayInSeconds = Support::convertTimespan($nextDelay, $unitType, Settings::UNIT_SECONDS);
+        $nextDelayInMs = Support::convertTimespan($nextDelay, $unitType, Settings::UNIT_MILLISECONDS);
+        $nextDelayInUs = Support::convertTimespan($nextDelay, $unitType, Settings::UNIT_MICROSECONDS);
 
         $workingTimeInSeconds = Support::convertTimespan($workingTime, $unitType, Settings::UNIT_SECONDS);
         $workingTimeInMs = Support::convertTimespan($workingTime, $unitType, Settings::UNIT_MILLISECONDS);
@@ -77,29 +84,37 @@ class AttemptLogUnitTest extends PHPUnitTestCase
 
         $dto = new AttemptLog(
             $attemptNumber,
-            $maxPossibleAttempts,
+            $maxAttempts,
             $firstAttemptOccurredAt,
             $thisAttemptOccurredAt,
-            $delay,
             $workingTime,
-            $overallDelay,
             $overallWorkingTime,
+            $prevDelay,
+            $nextDelay,
+            $overallDelay,
             $unitType,
         );
 
 
 
+        // attempt counts
         self::assertSame($attemptNumber, $dto->attemptNumber());
-        self::assertSame($maxPossibleAttempts, $dto->maxPossibleAttempts());
+        self::assertSame($attemptNumber - 1, $dto->retryNumber());
+        self::assertSame($maxAttempts, $dto->maxAttempts());
+
+
+
+        // first attempt occurred at
         self::assertSame($firstAttemptOccurredAt, $dto->firstAttemptOccurredAt());
+        $occurredAt = new DateTime();
+        $dto->setFirstAttemptOccurredAt($occurredAt);
+        self::assertSame($occurredAt, $dto->firstAttemptOccurredAt());
+
+        // this attempt occurred at
         self::assertSame($thisAttemptOccurredAt, $dto->thisAttemptOccurredAt());
-
-
-
-        self::assertSame($delay, $dto->delay());
-        self::assertSame($delayInSeconds, $dto->delayInSeconds());
-        self::assertSame($delayInMs, $dto->delayInMs());
-        self::assertSame($delayInUs, $dto->delayInUs());
+        $occurredAt = new DateTime();
+        $dto->setThisAttemptOccurredAt($occurredAt);
+        self::assertSame($occurredAt, $dto->thisAttemptOccurredAt());
 
 
 
@@ -108,13 +123,13 @@ class AttemptLogUnitTest extends PHPUnitTestCase
         self::assertSame($workingTimeInSeconds, $dto->workingTimeInSeconds());
         self::assertSame($workingTimeInMs, $dto->workingTimeInMs());
         self::assertSame($workingTimeInUs, $dto->workingTimeInUs());
-
+        // set to null
         $dto->setWorkingTime(null);
         self::assertNull($dto->workingTime());
         self::assertNull($dto->workingTimeInSeconds());
         self::assertNull($dto->workingTimeInMs());
         self::assertNull($dto->workingTimeInUs());
-
+        // set back again
         $dto->setWorkingTime($workingTime);
         self::assertSame($workingTime, $dto->workingTime());
         self::assertSame($workingTimeInSeconds, $dto->workingTimeInSeconds());
@@ -123,29 +138,46 @@ class AttemptLogUnitTest extends PHPUnitTestCase
 
 
 
+        // overall working time
+        self::assertSame($overallWorkingTime, $dto->overallWorkingTime());
+        self::assertSame($overallWorkingTimeInSeconds, $dto->overallWorkingTimeInSeconds());
+        self::assertSame($overallWorkingTimeInMs, $dto->overallWorkingTimeInMs());
+        self::assertSame($overallWorkingTimeInUs, $dto->overallWorkingTimeInUs());
+        // set to null
+        $dto->setOverallWorkingTime(null);
+        self::assertNull($dto->overallWorkingTime());
+        self::assertNull($dto->overallWorkingTimeInSeconds());
+        self::assertNull($dto->overallWorkingTimeInMs());
+        self::assertNull($dto->overallWorkingTimeInUs());
+        // set back again
+        $dto->setOverallWorkingTime($overallWorkingTime);
+        self::assertSame($overallWorkingTime, $dto->overallWorkingTime());
+        self::assertSame($overallWorkingTimeInSeconds, $dto->overallWorkingTimeInSeconds());
+        self::assertSame($overallWorkingTimeInMs, $dto->overallWorkingTimeInMs());
+        self::assertSame($overallWorkingTimeInUs, $dto->overallWorkingTimeInUs());
+
+
+
+        // prev delay
+        self::assertSame($prevDelay, $dto->prevDelay());
+        self::assertSame($prevDelayInSeconds, $dto->prevDelayInSeconds());
+        self::assertSame($prevDelayInMs, $dto->prevDelayInMs());
+        self::assertSame($prevDelayInUs, $dto->prevDelayInUs());
+
+        // next delay
+        self::assertSame($nextDelay, $dto->nextDelay());
+        self::assertSame($nextDelayInSeconds, $dto->nextDelayInSeconds());
+        self::assertSame($nextDelayInMs, $dto->nextDelayInMs());
+        self::assertSame($nextDelayInUs, $dto->nextDelayInUs());
+        self::assertSame(!is_null($nextDelay), $dto->willRetry());
+
+        // overall delay
         self::assertSame($overallDelay, $dto->overallDelay());
         self::assertSame($overallDelayInSeconds, $dto->overallDelayInSeconds());
         self::assertSame($overallDelayInMs, $dto->overallDelayInMs());
         self::assertSame($overallDelayInUs, $dto->overallDelayInUs());
 
 
-
-        self::assertSame($overallWorkingTime, $dto->overallWorkingTime());
-        self::assertSame($overallWorkingTimeInSeconds, $dto->overallWorkingTimeInSeconds());
-        self::assertSame($overallWorkingTimeInMs, $dto->overallWorkingTimeInMs());
-        self::assertSame($overallWorkingTimeInUs, $dto->overallWorkingTimeInUs());
-
-        $dto->setOverallWorkingTime(null);
-        self::assertNull($dto->overallWorkingTime());
-        self::assertNull($dto->overallWorkingTimeInSeconds());
-        self::assertNull($dto->overallWorkingTimeInMs());
-        self::assertNull($dto->overallWorkingTimeInUs());
-
-        $dto->setOverallWorkingTime($overallWorkingTime);
-        self::assertSame($overallWorkingTime, $dto->overallWorkingTime());
-        self::assertSame($overallWorkingTimeInSeconds, $dto->overallWorkingTimeInSeconds());
-        self::assertSame($overallWorkingTimeInMs, $dto->overallWorkingTimeInMs());
-        self::assertSame($overallWorkingTimeInUs, $dto->overallWorkingTimeInUs());
 
         self::assertSame($unitType, $dto->unitType());
     }
@@ -161,26 +193,27 @@ class AttemptLogUnitTest extends PHPUnitTestCase
 
         $default = [
             'attemptNumber' => 1,
-            'maxPossibleAttempts' => null,
+            'maxAttempts' => null,
             'firstAttemptOccurredAt' => new DateTime('2024-01-01 00:00:00'),
             'thisAttemptOccurredAt' => new DateTime('2024-01-01 00:00:01'),
-            'delay' => null,
             'workingTime' => null,
-            'overallDelay' => null,
             'overallWorkingTime' => null,
+            'prevDelay' => null,
+            'nextDelay' => null,
+            'overallDelay' => null,
             'unitType' => Settings::UNIT_SECONDS,
         ];
 
 
 
         $attemptNumbers = [1, 2];
-        $maxPossibleAttempts = [null, 1, 10];
+        $maxAttempts = [null, 1, 10];
         $firstAttemptOccurredAts = [new DateTime('2024-01-01 00:00:00')];
         $thisAttemptOccurredAts = [new DateTime('2024-01-01 00:00:01')];
         $timespans = [
             Settings::UNIT_SECONDS => [null, 0, 0.5, 1, 2],
-            Settings::UNIT_MILLISECONDS => [null, 0, 500, 1000, 2000],
-            Settings::UNIT_MICROSECONDS => [null, 0, 500_000, 1000_000, 2000_000],
+            Settings::UNIT_MILLISECONDS => [null, 0, 500.0, 1000.0, 2000.0],
+            Settings::UNIT_MICROSECONDS => [null, 0, 500_000.0, 1_000_000.0, 2_000_000.0],
         ];
 
 
@@ -189,8 +222,8 @@ class AttemptLogUnitTest extends PHPUnitTestCase
             $return[] = array_merge($default, ['attemptNumber' => $attemptNumber]);
         }
 
-        foreach ($maxPossibleAttempts as $maxPossibleAttemptsValue) {
-            $return[] = array_merge($default, ['$maxPossibleAttempts' => $maxPossibleAttemptsValue]);
+        foreach ($maxAttempts as $maxAttemptsValue) {
+            $return[] = array_merge($default, ['maxAttempts' => $maxAttemptsValue]);
         }
 
         foreach ($firstAttemptOccurredAts as $firstAttemptOccurredAt) {
@@ -203,10 +236,11 @@ class AttemptLogUnitTest extends PHPUnitTestCase
 
         foreach (array_keys($timespans) as $unitType) {
             foreach ($timespans[$unitType] as $timespan) {
-                $return[] = array_merge($default, ['delay' => $timespan, 'unitType' => $unitType]);
                 $return[] = array_merge($default, ['workingTime' => $timespan, 'unitType' => $unitType]);
-                $return[] = array_merge($default, ['overallDelay' => $timespan, 'unitType' => $unitType]);
                 $return[] = array_merge($default, ['overallWorkingTime' => $timespan, 'unitType' => $unitType]);
+                $return[] = array_merge($default, ['prevDelay' => $timespan, 'unitType' => $unitType]);
+                $return[] = array_merge($default, ['nextDelay' => $timespan, 'unitType' => $unitType]);
+                $return[] = array_merge($default, ['overallDelay' => $timespan, 'unitType' => $unitType]);
             }
         }
 
@@ -228,6 +262,7 @@ class AttemptLogUnitTest extends PHPUnitTestCase
             null,
             new DateTime('2024-01-01 00:00:00'),
             new DateTime('2024-01-01 00:00:01'),
+            null,
             null,
             null,
             null,

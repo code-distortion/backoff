@@ -2,8 +2,8 @@
 
 namespace CodeDistortion\Backoff\Jitter;
 
+use CodeDistortion\Backoff\Interfaces\JitterInterface;
 use CodeDistortion\Backoff\Support\BaseJitter;
-use CodeDistortion\Backoff\Support\JitterInterface;
 
 /**
  * A class that applies full jitter to delays.

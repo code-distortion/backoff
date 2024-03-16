@@ -2,6 +2,8 @@
 
 namespace CodeDistortion\Backoff\Support;
 
+use CodeDistortion\Backoff\Interfaces\BackoffAlgorithmInterface;
+
 /**
  * Abstract class for classes that provide a backoff algorithm.
  */

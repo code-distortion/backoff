@@ -3,8 +3,8 @@
 namespace CodeDistortion\Backoff\Jitter;
 
 use CodeDistortion\Backoff\Exceptions\BackoffInitialisationException;
+use CodeDistortion\Backoff\Interfaces\JitterInterface;
 use CodeDistortion\Backoff\Support\BaseJitter;
-use CodeDistortion\Backoff\Support\JitterInterface;
 
 /**
  * A class that applies a custom jitter range to delays.

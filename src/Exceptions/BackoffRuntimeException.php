@@ -31,29 +31,22 @@ class BackoffRuntimeException extends BackoffException
     }
 
     /**
-     * A callback could not be called because it does not accept 0 or 1 parameters.
+     * When startOfAttempt() is called after the Backoff has stopped.
      *
-     * @param string[] $parameters The parameters that the callback accepts.
      * @return self
      */
-    public static function exceptionCallbackAcceptsMoreThan1Param(array $parameters): self
+    public static function startOfAttemptNotAllowed(): self
     {
-        $count = count($parameters);
-        $parameters = implode(', ', $parameters);
-        return new self("Exception callback must accept 0 or 1 parameters, but it accepts $count ($parameters)");
+        return new self("Method ->startOfAttempt() cannot be called after the Backoff has stopped");
     }
 
     /**
-     * A callback could not be called because it contains a parameter that is not a Throwable.
+     * When endOfAttempt() is called without startOfAttempt() being called first.
      *
-     * @param string      $parameter The parameter that is not a Throwable.
-     * @param string|null $type      The parameter's type.
      * @return self
      */
-    public static function invalidExceptionCallbackParameter(string $parameter, ?string $type = null): self
+    public static function attemptLogHasNotStarted(): self
     {
-        return $type
-            ? new self("Callback parameter \"$type \$$parameter\" is not expecting a \Throwable")
-            : new self("Callback parameter \"\$$parameter\" is not expecting a \Throwable");
+        return new self("Method ->endOfAttempt() was called without ->startOfAttempt() being called first");
     }
 }

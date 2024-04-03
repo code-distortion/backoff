@@ -9,7 +9,7 @@ use CodeDistortion\Backoff\Exceptions\BackoffRuntimeException;
 use CodeDistortion\Backoff\Jitter\FullJitter;
 use CodeDistortion\Backoff\Settings;
 use CodeDistortion\Backoff\Tests\PHPUnitTestCase;
-use CodeDistortion\Backoff\Tests\Unit\Support\InvokableExceptionCallback;
+use CodeDistortion\Backoff\Tests\Unit\Support\InvokableClass;
 use CodeDistortion\Backoff\Tests\Unit\Support\OtherExcptn1;
 use CodeDistortion\Backoff\Tests\Unit\Support\OtherExcptn2;
 use CodeDistortion\Backoff\Tests\Unit\Support\OtherExcptn3;
@@ -2103,7 +2103,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
 
 
         // a callable array
-        $invokableClass = new InvokableExceptionCallback();
+        $invokableClass = new InvokableClass();
         $callable = [$invokableClass, '__invoke'];
 
         $count1 = $count2 = 0;
@@ -2301,7 +2301,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
 
 
         // a callable array
-        $invokableClass = new InvokableExceptionCallback();
+        $invokableClass = new InvokableClass();
         $callable = [$invokableClass, '__invoke'];
 
         $count1 = $count2 = 0;
@@ -2464,7 +2464,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
         self::assertSame(1, $count3);
 
         // one callback as a callable array
-        $invokableClass = new InvokableExceptionCallback();
+        $invokableClass = new InvokableClass();
         $callable = [$invokableClass, '__invoke'];
 
         $newBackoff()
@@ -2623,7 +2623,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
             self::assertSame(1, $count3);
 
             // one callback as a callable array
-            $invokableClass = new InvokableExceptionCallback();
+            $invokableClass = new InvokableClass();
             $callable = [$invokableClass, '__invoke'];
 
             $newBackoff()
@@ -2784,7 +2784,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
         self::assertSame(1, $count3);
 
         // one callback as a callable array
-        $invokableClass = new InvokableExceptionCallback();
+        $invokableClass = new InvokableClass();
         $callable = [$invokableClass, '__invoke'];
 
         $newBackoff()
@@ -2978,7 +2978,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
     }
 
     /**
-     * Data Provider for test_the_methods_that_require_the_strategy_not_to_have_started_yet().
+     * DataProvider for test_the_methods_that_require_the_strategy_not_to_have_started_yet().
      *
      * @return array<callable[]>
      */
@@ -3180,7 +3180,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
     }
 
     /**
-     * Data provider for test_the_attempt_logs_that_are_passed_to_callbacks().
+     * DataProvider for test_the_attempt_logs_that_are_passed_to_callbacks().
      *
      * @return array[]
      */

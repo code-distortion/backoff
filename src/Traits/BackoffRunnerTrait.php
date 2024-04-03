@@ -334,6 +334,7 @@ trait BackoffRunnerTrait
                 $wasSuccessful = true;
 
                 if (count($this->retryWhenResult)) {
+
                     // check to make sure the $result doesn't match anything from $this->retryWhenResult
                     if ($invalidResultMatch = $this->pickMatchingResult($result, $this->retryWhenResult)) {
                         $wasSuccessful = false;
@@ -343,6 +344,7 @@ trait BackoffRunnerTrait
                 }
 
                 if (count($this->retryUntilResult)) {
+
                     // or check to make sure the $result matches one of $this->isSuccessfulWhenResult
                     $validResultMatch = $this->pickMatchingResult($result, $this->retryUntilResult);
                     $wasSuccessful = !is_null($validResultMatch);

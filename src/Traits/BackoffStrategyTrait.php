@@ -431,11 +431,9 @@ trait BackoffStrategyTrait
             $this->attemptLogs = [];
         }
 
-        // todo - add this back in
-//        // close the last one of if needed
-//        if (isset($this->attemptLogs[$attemptNumber - 1])) {
-//            $this->endOfAttempt();
-//        }
+        // finalise the previous AttemptLog if needed
+        $prevAttemptLog = $this->attemptLogs[$attemptNumber - 1] ?? null;
+        $this->endAnAttempt($prevAttemptLog);
 
         $this->attemptLogs[$attemptNumber] = new AttemptLog(
             $attemptNumber,
@@ -474,8 +472,6 @@ trait BackoffStrategyTrait
      */
     public function endOfAttempt(): static
     {
-        $finishedAt = new DateTime(); // record the time closest to when this method was called
-
         $attemptNumber = $this->currentAttemptNumber();
         $attemptLog = $this->attemptLogs[$attemptNumber] ?? null;
 
@@ -483,10 +479,29 @@ trait BackoffStrategyTrait
             throw BackoffRuntimeException::attemptLogHasNotStarted();
         }
 
+        $this->endAnAttempt($attemptLog);
+
+        return $this;
+    }
+
+    /**
+     * Finalise the passed AttemptLog.
+     *
+     * @param AttemptLog|null $attemptLog The AttemptLog to finalise.
+     * @return void
+     */
+    private function endAnAttempt(?AttemptLog $attemptLog): void
+    {
+        $finishedAt = new DateTime(); // record the time closest to when this method was called
+
+        if (is_null($attemptLog)) {
+            return;
+        }
+
         // if the working time has already been set, don't update it.
         // this allows for the earliest time (this was triggered) is used
         if (!is_null($attemptLog->workingTime())) {
-            return $this;
+            return;
         }
 
         // calculate and record the working time
@@ -495,13 +510,11 @@ trait BackoffStrategyTrait
         $attemptLog->setWorkingTime($diffInUnits);
 
         // add this new working time, to the overall working time
-        $prevAttemptLog = $this->attemptLogs[$attemptNumber - 1] ?? null;
+        $prevAttemptLog = $this->attemptLogs[$attemptLog->attemptNumber() - 1] ?? null;
         if ($prevAttemptLog) {
             $diffInUnits += $prevAttemptLog->overallWorkingTime();
         }
         $attemptLog->setOverallWorkingTime($diffInUnits);
-
-        return $this;
     }
 
     /**

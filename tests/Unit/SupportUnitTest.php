@@ -5,6 +5,7 @@ namespace CodeDistortion\Backoff\Tests\Unit;
 use CodeDistortion\Backoff\Settings;
 use CodeDistortion\Backoff\Support\Support;
 use CodeDistortion\Backoff\Tests\PHPUnitTestCase;
+use CodeDistortion\Backoff\Tests\Unit\Support\InvokableClass;
 use DateTime;
 
 /**
@@ -232,5 +233,106 @@ class SupportUnitTest extends PHPUnitTestCase
             1.000_001,
             Support::timeDiff(new DateTime('2024-01-01 00:00:00'), new DateTime('2024-01-01 00:00:01.000001'))
         );
+    }
+
+
+
+    /**
+     * Test the normalisation of parameters - that the parameters are combined as an array.
+     *
+     * @test
+     * @dataProvider normalisedParametersDataProvider
+     *
+     * @param mixed[] $parameters       The parameters to normalise.
+     * @param boolean $checkForCallable When detecting arrays to flatten, whether to check for arrays that are callable.
+     * @param mixed[] $expected         The expected result.
+     * @return void
+     */
+    public static function test_the_normalisation_of_parameters(
+        array $parameters,
+        bool $checkForCallable,
+        array $expected,
+    ): void {
+
+        $result = Support::normaliseParameters($parameters, $checkForCallable);
+
+        self::assertSame($expected, $result);
+    }
+
+    /**
+     * DataProvider for test_the_normalisation_of_parameters.
+     *
+     * @return array<array<string,mixed[]|boolean>>
+     */
+    public static function normalisedParametersDataProvider(): array
+    {
+        $closure1 = fn() => true;
+        $closure2 = fn() => true;
+
+        $invokableClass = new InvokableClass();
+        $invokable1 = [$invokableClass, '__invoke'];
+
+        return [
+
+            // different combinations of arrays
+            [
+                'parameters' => [],
+                'checkForCallable' => false,
+                'expected' => [],
+            ],
+            [
+                'parameters' => [1, 2, 3],
+                'checkForCallable' => false,
+                'expected' => [1, 2, 3],
+            ],
+            [
+                'parameters' => [[1, 2], 3],
+                'checkForCallable' => false,
+                'expected' => [1, 2, 3],
+            ],
+            [
+                'parameters' => [[1], [2], [3]],
+                'checkForCallable' => false,
+                'expected' => [1, 2, 3],
+            ],
+            [
+                'parameters' => [1, ['2a', '2b'], [[3]]],
+                'checkForCallable' => false,
+                'expected' => [1, '2a', '2b', [3]],
+            ],
+            [
+                'parameters' => [$closure1],
+                'checkForCallable' => false,
+                'expected' => [$closure1],
+            ],
+
+
+
+            // closures
+            [
+                'parameters' => [$closure1, [$closure2]],
+                'checkForCallable' => false,
+                'expected' => [$closure1, $closure2],
+            ],
+            [
+                'parameters' => [$closure1, [$closure2]],
+                'checkForCallable' => true,
+                'expected' => [$closure1, $closure2],
+            ],
+
+
+
+            // [object, method] array
+            [
+                'parameters' => [$closure1, $invokable1],
+                'checkForCallable' => false,
+                'expected' => [$closure1, $invokableClass, '__invoke'],
+            ],
+            [
+                'parameters' => [$closure1, $invokable1],
+                'checkForCallable' => true,
+                'expected' => [$closure1, $invokable1],
+            ],
+        ];
     }
 }

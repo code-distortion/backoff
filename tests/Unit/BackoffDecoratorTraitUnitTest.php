@@ -166,20 +166,20 @@ class BackoffDecoratorTraitUnitTest extends PHPUnitTestCase
         self::assertSame($delaysDefault['delay'], $delaysDefault['delayInSeconds']);
         self::assertNotSame($delaysDefault['delay'], $delaysNoJitter['delay']);
 
-        $delaysDefault = Backoff::polynomial(1, 1.5)->generateTestSequence(10);
-        $delaysNoJitter = Backoff::polynomial(1, 1.5)->noJitter()->generateTestSequence(10);
+        $delaysDefault = Backoff::polynomial(1, 1.4)->generateTestSequence(10);
+        $delaysNoJitter = Backoff::polynomial(1, 1.4)->noJitter()->generateTestSequence(10);
         self::assertSame(
             [
                 1.0,
-                2.8284271247461903,
-                5.196152422706632,
-                8.0,
-                11.180339887498949,
-                14.696938456699069,
-                18.520259177452136,
-                22.627416997969522,
-                27.0,
-                31.622776601683793,
+                2.6390158215457884,
+                4.655536721746079,
+                6.964404506368992,
+                9.518269693579391,
+                12.286035066475314,
+                15.245344971379456,
+                18.379173679952558,
+                21.674022167526225,
+                25.118864315095795,
             ],
             $delaysNoJitter['delay'],
         );
@@ -196,20 +196,20 @@ class BackoffDecoratorTraitUnitTest extends PHPUnitTestCase
         self::assertSame($delaysDefault['delay'], $delaysDefault['delayInMs']);
         self::assertNotSame($delaysDefault['delay'], $delaysNoJitter['delay']);
 
-        $delaysDefault = Backoff::polynomialMs(1000, 1.5)->generateTestSequence(10);
-        $delaysNoJitter = Backoff::polynomialMs(1000, 1.5)->noJitter()->generateTestSequence(10);
+        $delaysDefault = Backoff::polynomialMs(1000, 1.4)->generateTestSequence(10);
+        $delaysNoJitter = Backoff::polynomialMs(1000, 1.4)->noJitter()->generateTestSequence(10);
         self::assertSame(
             [
                 1000.0,
-                2828.42712474619,
-                5196.152422706632,
-                8000.0,
-                11_180.339887498949,
-                14_696.938456699069,
-                18_520.259177452136,
-                22_627.416997969522,
-                27_000.0,
-                31_622.776601683793,
+                2639.015821545788,
+                4655.536721746079,
+                6964.404506368992,
+                9518.269693579392,
+                12_286.035066475315,
+                15_245.344971379456,
+                18_379.173679952557,
+                21_674.022167526226,
+                25_118.864315095794,
             ],
             $delaysNoJitter['delay'],
         );
@@ -226,20 +226,20 @@ class BackoffDecoratorTraitUnitTest extends PHPUnitTestCase
         self::assertSame($delaysDefault['delay'], $delaysDefault['delayInUs']);
         self::assertNotSame($delaysDefault['delay'], $delaysNoJitter['delay']);
 
-        $delaysDefault = Backoff::polynomialUs(1000, 1.5)->generateTestSequence(10);
-        $delaysNoJitter = Backoff::polynomialUs(1000, 1.5)->noJitter()->generateTestSequence(10);
+        $delaysDefault = Backoff::polynomialUs(1000, 1.4)->generateTestSequence(10);
+        $delaysNoJitter = Backoff::polynomialUs(1000, 1.4)->noJitter()->generateTestSequence(10);
         self::assertSame(
             [
                 1000.0,
-                2828.42712474619,
-                5196.152422706632,
-                8000.0,
-                11_180.339887498949,
-                14_696.938456699069,
-                18_520.259177452136,
-                22_627.416997969522,
-                27_000.0,
-                31_622.776601683793,
+                2639.015821545788,
+                4655.536721746079,
+                6964.404506368992,
+                9518.269693579392,
+                12_286.035066475315,
+                15_245.344971379456,
+                18_379.173679952557,
+                21_674.022167526226,
+                25_118.864315095794,
             ],
             $delaysNoJitter['delay']
         );

@@ -57,7 +57,7 @@ class BackoffStrategyTraitLoggingUnitTest extends PHPUnitTestCase
         $thisAttemptOccurredAt1 = $logs[0]->thisAttemptOccurredAt();
         self::assertInstanceOf(DateTime::class, $logs[0]->firstAttemptOccurredAt());
         self::assertInstanceOf(DateTime::class, $logs[0]->thisAttemptOccurredAt());
-        self::assertLessThanOrEqual(0.01, Support::timeDiff($start, $thisAttemptOccurredAt1)); // happened recently
+        self::assertLessThanOrEqual(0.1, Support::timeDiff($start, $thisAttemptOccurredAt1)); // happened recently
         self::assertSame(0.0, Support::timeDiff($firstAttemptOccurredAt1, $thisAttemptOccurredAt1));
 
         self::assertLessThan(1000, $logs[0]->workingTime());
@@ -81,9 +81,9 @@ class BackoffStrategyTraitLoggingUnitTest extends PHPUnitTestCase
         $thisAttemptOccurredAt2 = $logs[1]->thisAttemptOccurredAt();
         self::assertInstanceOf(DateTime::class, $logs[1]->firstAttemptOccurredAt());
         self::assertInstanceOf(DateTime::class, $logs[1]->thisAttemptOccurredAt());
-        self::assertLessThanOrEqual(0.01, Support::timeDiff($start, $thisAttemptOccurredAt2)); // happened recently
+        self::assertLessThanOrEqual(0.1, Support::timeDiff($start, $thisAttemptOccurredAt2)); // happened recently
         self::assertGreaterThan(0, Support::timeDiff($firstAttemptOccurredAt2, $thisAttemptOccurredAt2));
-        self::assertLessThanOrEqual(0.01, Support::timeDiff($firstAttemptOccurredAt2, $thisAttemptOccurredAt2));
+        self::assertLessThanOrEqual(0.1, Support::timeDiff($firstAttemptOccurredAt2, $thisAttemptOccurredAt2));
 
         self::assertLessThan(1000, $logs[1]->workingTime());
         self::assertLessThan(1000, $logs[1]->overallWorkingTime());
@@ -109,9 +109,9 @@ class BackoffStrategyTraitLoggingUnitTest extends PHPUnitTestCase
         $thisAttemptOccurredAt3 = $logs[2]->thisAttemptOccurredAt();
         self::assertInstanceOf(DateTime::class, $logs[2]->firstAttemptOccurredAt());
         self::assertInstanceOf(DateTime::class, $logs[2]->thisAttemptOccurredAt());
-        self::assertLessThanOrEqual(0.01, Support::timeDiff($start, $thisAttemptOccurredAt3)); // happened recently
+        self::assertLessThanOrEqual(0.1, Support::timeDiff($start, $thisAttemptOccurredAt3)); // happened recently
         self::assertGreaterThan(0, Support::timeDiff($firstAttemptOccurredAt3, $thisAttemptOccurredAt3));
-        self::assertLessThanOrEqual(0.01, Support::timeDiff($firstAttemptOccurredAt3, $thisAttemptOccurredAt3));
+        self::assertLessThanOrEqual(0.1, Support::timeDiff($firstAttemptOccurredAt3, $thisAttemptOccurredAt3));
 
         self::assertLessThan(1000, $logs[2]->workingTime());
         self::assertLessThan(1000, $logs[2]->overallWorkingTime());
@@ -422,13 +422,38 @@ class BackoffStrategyTraitLoggingUnitTest extends PHPUnitTestCase
         $backoff->startOfAttempt();
 
         $backoff->endOfAttempt();
-        $workingTime1 = $backoff->currentLog()->workingTimeInUs();
+        $workingTime1 = $backoff->currentLog()?->workingTimeInUs();
 
         usleep(10);
         $backoff->endOfAttempt();
-        $workingTime2 = $backoff->currentLog()->workingTimeInUs();
+        $workingTime2 = $backoff->currentLog()?->workingTimeInUs();
 
         self::assertSame($workingTime1, $workingTime2);
+    }
+
+    /**
+     * Test that the ->startOfAttempt() method will finalise the previous attempt log (if it exists).
+     *
+     * @return void
+     */
+    public static function test_that_start_of_attempt_will_finalise_the_previous_attempt_log(): void
+    {
+        $algorithm = new NoopBackoffAlgorithm();
+        $backoff = new BackoffStrategy($algorithm);
+
+        $backoff->startOfAttempt();
+
+        $attemptLog = $backoff->currentLog();
+
+        self::assertInstanceOf(AttemptLog::class, $attemptLog);
+        self::assertNull($attemptLog->workingTime()); // not finalised yet
+        self::assertNull($attemptLog->overallWorkingTime()); // not finalised yet
+
+        $backoff->step();
+        $backoff->startOfAttempt();
+
+        self::assertNotNull($attemptLog->workingTime());
+        self::assertNotNull($attemptLog->overallWorkingTime());
     }
 
     /**

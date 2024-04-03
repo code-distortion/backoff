@@ -3,9 +3,9 @@
 namespace CodeDistortion\Backoff\Tests\Unit\Support;
 
 /**
- * An invokable class that can be used as a callback for the Backoff class.
+ * An invokable class that can records whether it's been invoked or not.
  */
-class InvokableExceptionCallback
+class InvokableClass
 {
     /** @var integer A count of how many times __invoke() is called. */
     private int $count = 0;

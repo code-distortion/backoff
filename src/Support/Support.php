@@ -110,11 +110,9 @@ abstract class Support
     /**
      * Take the parameters and return them as an array.
      *
-     * todo - test this method
-     *
      * @param mixed[] $parameters       The parameters to normalise.
      * @param boolean $checkForCallable When detecting arrays to flatten, whether to check for an array that's callable.
-     * @return array
+     * @return mixed[]
      */
     public static function normaliseParameters(array $parameters, bool $checkForCallable = false): array
     {

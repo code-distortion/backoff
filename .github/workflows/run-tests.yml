@@ -15,14 +15,13 @@ jobs:
 
   all_tests:
 
-    name: "PHP${{ matrix.php }} TB${{ matrix.testbench }} ${{ matrix.os-title }} ${{ matrix.dependency-prefer-title }}"
+    name: "PHP${{ matrix.php }} ${{ matrix.os-title }} ${{ matrix.dependency-prefer-title }}"
     runs-on: "${{ matrix.os }}"
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         os: [ "ubuntu-latest", "macos-latest", "windows-latest" ]
-        php: [ "8.3", "8.2", "8.1", "8.0", "7.4", "7.3", "7.2", "7.1", "7.0" ]
-        testbench: [ "^8.0", "^7.0" ]
+        php: [ "8.3", "8.2", "8.1", "8.0" ]
         dependency-prefer: [ "prefer-stable", "prefer-lowest" ]
         include:
           # remember, either:
@@ -41,21 +40,6 @@ jobs:
           - php: "8.0"
             phpunit: "^9.3"
             phpunit-config-file: "phpunit.github-actions.up-to-9.xml.dist"
-          - php: "7.4"
-            phpunit: "^9.3"
-            phpunit-config-file: "phpunit.github-actions.up-to-9.xml.dist"
-          - php: "7.3"
-            phpunit: "^9.3"
-            phpunit-config-file: "phpunit.github-actions.up-to-9.xml.dist"
-          - php: "7.2"
-            phpunit: "^8.0"
-            phpunit-config-file: "phpunit.github-actions.up-to-9.xml.dist"
-          - php: "7.1"
-            phpunit: "^7.0"
-            phpunit-config-file: "phpunit.github-actions.up-to-9.xml.dist"
-          - php: "7.0"
-            phpunit: "^6.0"
-            phpunit-config-file: "phpunit.github-actions.up-to-9.xml.dist"
 
           - os: "ubuntu-latest"
             os-title: "ubuntu"
@@ -68,9 +52,6 @@ jobs:
             dependency-prefer-title: "stable"
           - dependency-prefer: "prefer-lowest"
             dependency-prefer-title: "lowest"
-#        exclude:
-#          - php: "8.2"
-#            xyz: "^5.0"
 
     steps:
       - name: "Checkout code"
@@ -83,7 +64,6 @@ jobs:
         uses: "shivammathur/setup-php@v2"
         with:
           php-version: "${{ matrix.php }}"
-          extensions: fileinfo, XXXX, etc
           ini-values: "error_reporting=E_ALL"
           coverage: none
         env:
@@ -100,7 +80,7 @@ jobs:
         uses: "actions/cache@v3"
         with:
           path: "${{ steps.composer-cache.outputs.composer_cache_dir }}"
-# XXXX          key: "[${{ matrix.os }}][php-${{ matrix.php }}][testbench-${{ matrix.testbench }}][${{ matrix.dependency-prefer }}][composer.json-${{ hashFiles('composer.json') }}]"
+          key: "[${{ matrix.os }}][php-${{ matrix.php }}][${{ matrix.dependency-prefer }}][composer.json-${{ hashFiles('composer.json') }}]"
 
       - name: "Install dependencies"
         uses: "nick-fields/retry@v2"
@@ -109,12 +89,11 @@ jobs:
           max_attempts: 5
           shell: bash # make sure "^" characters are interpreted properly on Windows (e.g. in "^5.0")
           command: |
-# XXXX            composer remove "infection/infection" --dev --no-interaction --no-update
-# XXXX            composer remove "phpstan/phpstan" --dev --no-interaction --no-update
-# XXXX            composer remove "squizlabs/php_codesniffer" --dev --no-interaction --no-update
-# XXXX            composer require "orchestra/testbench:${{ matrix.testbench }}" --dev --no-interaction --no-update
-# XXXX            composer require "phpunit/phpunit:${{ matrix.phpunit }}" --dev --no-interaction --no-update
-# XXXX            composer update --${{ matrix.dependency-prefer }} --prefer-dist --no-interaction --optimize-autoloader --no-progress
+            composer remove "infection/infection" --dev --no-interaction --no-update
+            composer remove "phpstan/phpstan" --dev --no-interaction --no-update
+            composer remove "squizlabs/php_codesniffer" --dev --no-interaction --no-update
+            composer require "phpunit/phpunit:${{ matrix.phpunit }}" --dev --no-interaction --no-update
+            composer update --${{ matrix.dependency-prefer }} --prefer-dist --no-interaction --optimize-autoloader --no-progress
 
       - name: "Execute tests"
         run: vendor/bin/phpunit --configuration=${{ matrix.phpunit-config-file }} --no-coverage --stop-on-error --stop-on-failure

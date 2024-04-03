@@ -88,33 +88,33 @@ class JitterUnitTest extends PHPUnitTestCase
     public static function test_the_range_of_responses_the_different_jitter_classes_generate(): void
     {
         // lower bound is 0
-        self::testJitterResponses(new RangeJitter(-1, -1), 1, 0, 0);
-        self::testJitterResponses(new RangeJitter(-1, 0), 1, 0, 0);
-        self::testJitterResponses(new RangeJitter(0, 0), 1, 0, 0);
-        self::testJitterResponses(new RangeJitter(-1, 1), 1, 0, 1);
+        self::checkJitterResponses(new RangeJitter(-1, -1), 1, 0, 0);
+        self::checkJitterResponses(new RangeJitter(-1, 0), 1, 0, 0);
+        self::checkJitterResponses(new RangeJitter(0, 0), 1, 0, 0);
+        self::checkJitterResponses(new RangeJitter(-1, 1), 1, 0, 1);
 
         // ranges above 0
-        self::testJitterResponses(new RangeJitter(0, 0.25), 1, 0, 0.25);
-        self::testJitterResponses(new RangeJitter(0.25, 0.5), 1, 0.25, 0.5);
-        self::testJitterResponses(new RangeJitter(0.5, 0.75), 1, 0.5, 0.75);
-        self::testJitterResponses(new RangeJitter(0.75, 1), 1, 0.75, 1);
-        self::testJitterResponses(new RangeJitter(0, 1), 1, 0, 1);
-        self::testJitterResponses(new RangeJitter(0.75, 1.25), 1, 0.75, 1.25);
-        self::testJitterResponses(new RangeJitter(1, 2), 1, 1, 2);
+        self::checkJitterResponses(new RangeJitter(0, 0.25), 1, 0, 0.25);
+        self::checkJitterResponses(new RangeJitter(0.25, 0.5), 1, 0.25, 0.5);
+        self::checkJitterResponses(new RangeJitter(0.5, 0.75), 1, 0.5, 0.75);
+        self::checkJitterResponses(new RangeJitter(0.75, 1), 1, 0.75, 1);
+        self::checkJitterResponses(new RangeJitter(0, 1), 1, 0, 1);
+        self::checkJitterResponses(new RangeJitter(0.75, 1.25), 1, 0.75, 1.25);
+        self::checkJitterResponses(new RangeJitter(1, 2), 1, 1, 2);
 
         // float delay
-        self::testJitterResponses(new RangeJitter(1, 2), 0.5, 0.5, 1);
+        self::checkJitterResponses(new RangeJitter(1, 2), 0.5, 0.5, 1);
 
         // larger delay
-        self::testJitterResponses(new RangeJitter(1, 2), 100, 100, 200);
+        self::checkJitterResponses(new RangeJitter(1, 2), 100, 100, 200);
 
         // full jitter
-        self::testJitterResponses(new FullJitter(), 1, 0, 1);
-        self::testJitterResponses(new FullJitter(), 100, 0, 100);
+        self::checkJitterResponses(new FullJitter(), 1, 0, 1);
+        self::checkJitterResponses(new FullJitter(), 100, 0, 100);
 
         // equal jitter
-        self::testJitterResponses(new EqualJitter(), 1, 0.5, 1);
-        self::testJitterResponses(new EqualJitter(), 100, 50, 100);
+        self::checkJitterResponses(new EqualJitter(), 1, 0.5, 1);
+        self::checkJitterResponses(new EqualJitter(), 100, 50, 100);
     }
 
     /**
@@ -126,7 +126,7 @@ class JitterUnitTest extends PHPUnitTestCase
      * @param integer|float   $expectedMax The maximum value that should be found.
      * @return void
      */
-    private static function testJitterResponses(
+    private static function checkJitterResponses(
         JitterInterface $jitter,
         int|float $delay,
         int|float $expectedMin,

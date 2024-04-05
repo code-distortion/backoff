@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodeDistortion\Backoff\Tests\Unit;
 
 use CodeDistortion\Backoff\Algorithms\CallbackBackoffAlgorithm;
@@ -18,6 +20,8 @@ use CodeDistortion\Backoff\Exceptions\BackoffRuntimeException;
 use CodeDistortion\Backoff\Interfaces\BackoffAlgorithmInterface;
 use CodeDistortion\Backoff\Support\BaseBackoffAlgorithm;
 use CodeDistortion\Backoff\Tests\PHPUnitTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Test;
 use stdClass;
 
 /**
@@ -37,6 +41,8 @@ class BackoffAlgorithmUnitTest extends PHPUnitTestCase
      * @param array<integer|float|false> $expected        The expected delays that should be generated.
      * @return void
      */
+    #[Test]
+    #[DataProvider('backoffAlgorithmDataProvider')]
     public static function test_backoff_algorithm_output(callable $createAlgorithm, array $expected): void
     {
         /** @var BaseBackoffAlgorithm $algorithmInstance */
@@ -47,7 +53,7 @@ class BackoffAlgorithmUnitTest extends PHPUnitTestCase
     /**
      * DataProvider for test_normalisation_of_time_inputs.
      *
-     * @return array
+     * @return array<array<callable|array<integer|float|false>>>
      */
     public static function backoffAlgorithmDataProvider(): array
     {
@@ -351,6 +357,8 @@ class BackoffAlgorithmUnitTest extends PHPUnitTestCase
      * @param integer|float|null $multiplier The factor to multiply by each time.
      * @return void
      */
+    #[Test]
+    #[DataProvider('decorrelatedDataProvider')]
     public static function test_decorrelated_backoff_algorithm(int|float $baseDelay, int|float|null $multiplier): void
     {
         $algorithm = !is_null($multiplier)
@@ -410,6 +418,7 @@ class BackoffAlgorithmUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public static function test_random_backoff_algorithm(): void
     {
         $min = mt_rand(0, 100000);
@@ -451,8 +460,12 @@ class BackoffAlgorithmUnitTest extends PHPUnitTestCase
      * @test
      * @dataProvider jitterMayBeAppliedDataProvider
      *
+     * @param BackoffAlgorithmInterface $algorithm The algorithm to test.
+     * @param boolean                   $expected  The expected jitter setting.
      * @return void
      */
+    #[Test]
+    #[DataProvider('jitterMayBeAppliedDataProvider')]
     public static function test_which_backoff_strategies_allow_jitter(
         BackoffAlgorithmInterface $algorithm,
         bool $expected
@@ -464,7 +477,7 @@ class BackoffAlgorithmUnitTest extends PHPUnitTestCase
     /**
      * DataProvider for test_which_backoff_strategies_allow_jitter.
      *
-     * @return array
+     * @return array<array{BackoffAlgorithmInterface, bool}>
      */
     public static function jitterMayBeAppliedDataProvider(): array
     {
@@ -493,6 +506,7 @@ class BackoffAlgorithmUnitTest extends PHPUnitTestCase
      * @return void
      * @throws BackoffInitialisationException This will always be thrown.
      */
+    #[Test]
     public function test_that_random_backoff_throws_exception_when_max_is_less_than_min(): void
     {
         $this->expectException(BackoffInitialisationException::class);
@@ -512,6 +526,8 @@ class BackoffAlgorithmUnitTest extends PHPUnitTestCase
      * @return void
      * @throws BackoffRuntimeException This will always be thrown.
      */
+    #[Test]
+    #[DataProvider('invalidCallbackReturnValueDataProvider')]
     public function test_that_custom_backoff_throws_exceptions(mixed $invalidReturnValue): void
     {
         $this->expectException(BackoffRuntimeException::class);

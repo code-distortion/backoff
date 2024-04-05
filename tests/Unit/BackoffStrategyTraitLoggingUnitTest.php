@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodeDistortion\Backoff\Tests\Unit;
 
 use CodeDistortion\Backoff\Algorithms\LinearBackoffAlgorithm;
@@ -11,6 +13,8 @@ use CodeDistortion\Backoff\Support\Support;
 use CodeDistortion\Backoff\Tests\PHPUnitTestCase;
 use CodeDistortion\Backoff\Tests\Unit\Support\BackoffStrategy;
 use DateTime;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Test;
 
 /**
  * Test how the BackoffStrategyTrait logs the attempts.
@@ -33,6 +37,8 @@ class BackoffStrategyTraitLoggingUnitTest extends PHPUnitTestCase
      * @param callable $generateLogs A callback to run through a loop and generate logs.
      * @return void
      */
+    #[Test]
+    #[DataProvider('logGeneratorDataProvider')]
     public static function test_backoff_generates_logs_properly(callable $generateLogs): void
     {
         $start = new DateTime();
@@ -57,7 +63,7 @@ class BackoffStrategyTraitLoggingUnitTest extends PHPUnitTestCase
         $thisAttemptOccurredAt1 = $logs[0]->thisAttemptOccurredAt();
         self::assertInstanceOf(DateTime::class, $logs[0]->firstAttemptOccurredAt());
         self::assertInstanceOf(DateTime::class, $logs[0]->thisAttemptOccurredAt());
-        self::assertLessThanOrEqual(0.1, Support::timeDiff($start, $thisAttemptOccurredAt1)); // happened recently
+        self::assertLessThanOrEqual(0.1, Support::timeDiff($start, $thisAttemptOccurredAt1)); // happened recently // todo - change timing back to 0.01?
         self::assertSame(0.0, Support::timeDiff($firstAttemptOccurredAt1, $thisAttemptOccurredAt1));
 
         self::assertLessThan(1000, $logs[0]->workingTime());
@@ -81,9 +87,9 @@ class BackoffStrategyTraitLoggingUnitTest extends PHPUnitTestCase
         $thisAttemptOccurredAt2 = $logs[1]->thisAttemptOccurredAt();
         self::assertInstanceOf(DateTime::class, $logs[1]->firstAttemptOccurredAt());
         self::assertInstanceOf(DateTime::class, $logs[1]->thisAttemptOccurredAt());
-        self::assertLessThanOrEqual(0.1, Support::timeDiff($start, $thisAttemptOccurredAt2)); // happened recently
+        self::assertLessThanOrEqual(0.1, Support::timeDiff($start, $thisAttemptOccurredAt2)); // happened recently // todo - change timing back to 0.01?
         self::assertGreaterThan(0, Support::timeDiff($firstAttemptOccurredAt2, $thisAttemptOccurredAt2));
-        self::assertLessThanOrEqual(0.1, Support::timeDiff($firstAttemptOccurredAt2, $thisAttemptOccurredAt2));
+        self::assertLessThanOrEqual(0.1, Support::timeDiff($firstAttemptOccurredAt2, $thisAttemptOccurredAt2)); // todo - change timing back to 0.01?
 
         self::assertLessThan(1000, $logs[1]->workingTime());
         self::assertLessThan(1000, $logs[1]->overallWorkingTime());
@@ -109,9 +115,9 @@ class BackoffStrategyTraitLoggingUnitTest extends PHPUnitTestCase
         $thisAttemptOccurredAt3 = $logs[2]->thisAttemptOccurredAt();
         self::assertInstanceOf(DateTime::class, $logs[2]->firstAttemptOccurredAt());
         self::assertInstanceOf(DateTime::class, $logs[2]->thisAttemptOccurredAt());
-        self::assertLessThanOrEqual(0.1, Support::timeDiff($start, $thisAttemptOccurredAt3)); // happened recently
+        self::assertLessThanOrEqual(0.1, Support::timeDiff($start, $thisAttemptOccurredAt3)); // happened recently // todo - change timing back to 0.01?
         self::assertGreaterThan(0, Support::timeDiff($firstAttemptOccurredAt3, $thisAttemptOccurredAt3));
-        self::assertLessThanOrEqual(0.1, Support::timeDiff($firstAttemptOccurredAt3, $thisAttemptOccurredAt3));
+        self::assertLessThanOrEqual(0.1, Support::timeDiff($firstAttemptOccurredAt3, $thisAttemptOccurredAt3)); // todo - change timing back to 0.01?
 
         self::assertLessThan(1000, $logs[2]->workingTime());
         self::assertLessThan(1000, $logs[2]->overallWorkingTime());
@@ -264,6 +270,7 @@ class BackoffStrategyTraitLoggingUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public static function test_what_current_log_returns(): void
     {
         $algorithm = new NoopBackoffAlgorithm();
@@ -313,6 +320,7 @@ class BackoffStrategyTraitLoggingUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public static function test_that_no_log_is_generated_when_no_attempts_are_allowed(): void
     {
         $algorithm = new NoopBackoffAlgorithm();
@@ -379,6 +387,7 @@ class BackoffStrategyTraitLoggingUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public function test_that_end_of_attempt_cant_be_called_before_start_of_attempt(): void
     {
         $this->expectException(BackoffRuntimeException::class);
@@ -395,6 +404,7 @@ class BackoffStrategyTraitLoggingUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public function test_that_end_of_attempt_cant_be_called_before_start_of_attempt_after_reset(): void
     {
         $this->expectException(BackoffRuntimeException::class);
@@ -414,6 +424,7 @@ class BackoffStrategyTraitLoggingUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public static function test_that_end_of_attempt_wont_overwrite_the_calculated_working_time_when_called_twice(): void
     {
         $algorithm = new NoopBackoffAlgorithm();
@@ -436,6 +447,7 @@ class BackoffStrategyTraitLoggingUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public static function test_that_start_of_attempt_will_finalise_the_previous_attempt_log(): void
     {
         $algorithm = new NoopBackoffAlgorithm();
@@ -463,6 +475,7 @@ class BackoffStrategyTraitLoggingUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public static function test_that_reset_resets_the_logs(): void
     {
         $algorithm = new NoopBackoffAlgorithm();
@@ -514,6 +527,7 @@ class BackoffStrategyTraitLoggingUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public static function test_the_logged_unit_type(): void
     {
         $algorithm = new NoopBackoffAlgorithm();
@@ -527,7 +541,7 @@ class BackoffStrategyTraitLoggingUnitTest extends PHPUnitTestCase
         );
         $backoff->step();
         $backoff->startOfAttempt()->endOfAttempt();
-        self::assertSame(Settings::UNIT_SECONDS, $backoff->currentLog()->unitType());
+        self::assertSame(Settings::UNIT_SECONDS, $backoff->currentLog()?->unitType());
 
         $backoff = new BackoffStrategy(
             $algorithm,
@@ -538,7 +552,7 @@ class BackoffStrategyTraitLoggingUnitTest extends PHPUnitTestCase
         );
         $backoff->step();
         $backoff->startOfAttempt()->endOfAttempt();
-        self::assertSame(Settings::UNIT_MILLISECONDS, $backoff->currentLog()->unitType());
+        self::assertSame(Settings::UNIT_MILLISECONDS, $backoff->currentLog()?->unitType());
 
         $backoff = new BackoffStrategy(
             $algorithm,
@@ -549,7 +563,7 @@ class BackoffStrategyTraitLoggingUnitTest extends PHPUnitTestCase
         );
         $backoff->step();
         $backoff->startOfAttempt()->endOfAttempt();
-        self::assertSame(Settings::UNIT_MICROSECONDS, $backoff->currentLog()->unitType());
+        self::assertSame(Settings::UNIT_MICROSECONDS, $backoff->currentLog()?->unitType());
     }
 
     /**
@@ -559,6 +573,7 @@ class BackoffStrategyTraitLoggingUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public static function test_that_attempt_logs_arent_overwritten(): void
     {
         $algorithm = new NoopBackoffAlgorithm();

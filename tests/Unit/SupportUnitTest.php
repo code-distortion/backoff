@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodeDistortion\Backoff\Tests\Unit;
 
 use CodeDistortion\Backoff\Settings;
@@ -7,6 +9,8 @@ use CodeDistortion\Backoff\Support\Support;
 use CodeDistortion\Backoff\Tests\PHPUnitTestCase;
 use CodeDistortion\Backoff\Tests\Unit\Support\InvokableClass;
 use DateTime;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Test;
 
 /**
  * Test the Support class.
@@ -22,6 +26,7 @@ class SupportUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public static function test_random_float_generation(): void
     {
         for ($count = 0; $count < 100; $count++) {
@@ -46,6 +51,7 @@ class SupportUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public static function test_random_float_dec_pl(): void
     {
         // check the default number of decimal places
@@ -62,8 +68,11 @@ class SupportUnitTest extends PHPUnitTestCase
     /**
      * Test the generation of a really large floating point number, that will internally flow over the integer limit.
      *
+     * @test
+     *
      * @return void
      */
+    #[Test]
     public static function test_a_large_random_float(): void
     {
         self::assertNotSame(0, Support::randFloat(1_999_999, 20_000_000_000));
@@ -121,6 +130,8 @@ class SupportUnitTest extends PHPUnitTestCase
      * @param integer|float|null $expected        The expected result.
      * @return void
      */
+    #[Test]
+    #[DataProvider('timespanConversionProvider')]
     public static function test_timespan_conversions(
         int|float|null $timespan,
         string $currentUnitType,
@@ -200,8 +211,11 @@ class SupportUnitTest extends PHPUnitTestCase
     /**
      * Test that time differences can be calculated.
      *
+     * @test
+     *
      * @return void
      */
+    #[Test]
     public static function test_that_time_differences_can_be_calculated(): void
     {
         self::assertSame(
@@ -248,6 +262,8 @@ class SupportUnitTest extends PHPUnitTestCase
      * @param mixed[] $expected         The expected result.
      * @return void
      */
+    #[Test]
+    #[DataProvider('normalisedParametersDataProvider')]
     public static function test_the_normalisation_of_parameters(
         array $parameters,
         bool $checkForCallable,

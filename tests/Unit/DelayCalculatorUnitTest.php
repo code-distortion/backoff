@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodeDistortion\Backoff\Tests\Unit;
 
 use CodeDistortion\Backoff\Algorithms\CallbackBackoffAlgorithm;
@@ -15,6 +17,7 @@ use CodeDistortion\Backoff\Jitter\RangeJitter;
 use CodeDistortion\Backoff\Settings;
 use CodeDistortion\Backoff\Support\DelayCalculator;
 use CodeDistortion\Backoff\Tests\PHPUnitTestCase;
+use PHPUnit\Framework\Attributes\Test;
 
 /**
  * Test the DelayCalculator class.
@@ -30,6 +33,7 @@ class DelayCalculatorUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public static function test_get_base_delay_returns_the_same_results_each_time(): void
     {
         $delayCalculator = new DelayCalculator(
@@ -42,18 +46,18 @@ class DelayCalculatorUnitTest extends PHPUnitTestCase
             true,
         );
 
-        self::assertNull($delayCalculator->getBaseDelay(1));
+        self::assertNull($delayCalculator->getBaseDelay(0));
 
-        $delay1a = $delayCalculator->getBaseDelay(2);
-        $delay1b = $delayCalculator->getBaseDelay(2);
-        $delay1c = $delayCalculator->getBaseDelay(2);
+        $delay1a = $delayCalculator->getBaseDelay(1);
+        $delay1b = $delayCalculator->getBaseDelay(1);
+        $delay1c = $delayCalculator->getBaseDelay(1);
         self::assertIsFloat($delay1a);
         self::assertSame($delay1a, $delay1b);
         self::assertSame($delay1a, $delay1c);
 
-        $delay2a = $delayCalculator->getBaseDelay(3);
-        $delay2b = $delayCalculator->getBaseDelay(3);
-        $delay2c = $delayCalculator->getBaseDelay(3);
+        $delay2a = $delayCalculator->getBaseDelay(2);
+        $delay2b = $delayCalculator->getBaseDelay(2);
+        $delay2c = $delayCalculator->getBaseDelay(2);
         self::assertIsFloat($delay2a);
         self::assertSame($delay2a, $delay2b);
         self::assertSame($delay2a, $delay2c);
@@ -68,6 +72,7 @@ class DelayCalculatorUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public static function test_that_get_base_delay_uses_the_algorithm(): void
     {
         $delayCalculator = new DelayCalculator(
@@ -79,12 +84,12 @@ class DelayCalculatorUnitTest extends PHPUnitTestCase
             false,
             true,
         );
-        self::assertNull($delayCalculator->getBaseDelay(1));
-        self::assertSame(1, $delayCalculator->getBaseDelay(2));
-        self::assertSame(1.5, $delayCalculator->getBaseDelay(3));
-        self::assertSame(4, $delayCalculator->getBaseDelay(4));
-        self::assertSame(8, $delayCalculator->getBaseDelay(5));
-        self::assertNull($delayCalculator->getBaseDelay(6));
+        self::assertNull($delayCalculator->getBaseDelay(0));
+        self::assertSame(1, $delayCalculator->getBaseDelay(1));
+        self::assertSame(1.5, $delayCalculator->getBaseDelay(2));
+        self::assertSame(4, $delayCalculator->getBaseDelay(3));
+        self::assertSame(8, $delayCalculator->getBaseDelay(4));
+        self::assertNull($delayCalculator->getBaseDelay(5));
 
 
 
@@ -98,12 +103,12 @@ class DelayCalculatorUnitTest extends PHPUnitTestCase
             false,
             true,
         );
-        self::assertNull($delayCalculator->getBaseDelay(1));
-        self::assertSame(2, $delayCalculator->getBaseDelay(2));
-        self::assertSame(4, $delayCalculator->getBaseDelay(3));
-        self::assertSame(6, $delayCalculator->getBaseDelay(4));
-        self::assertSame(8, $delayCalculator->getBaseDelay(5));
-        self::assertSame(10, $delayCalculator->getBaseDelay(6));
+        self::assertNull($delayCalculator->getBaseDelay(0));
+        self::assertSame(2, $delayCalculator->getBaseDelay(1));
+        self::assertSame(4, $delayCalculator->getBaseDelay(2));
+        self::assertSame(6, $delayCalculator->getBaseDelay(3));
+        self::assertSame(8, $delayCalculator->getBaseDelay(4));
+        self::assertSame(10, $delayCalculator->getBaseDelay(5));
     }
 
 
@@ -115,6 +120,7 @@ class DelayCalculatorUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public static function test_that_get_base_delay_applies_bounds(): void
     {
         $delayCalculator = new DelayCalculator(
@@ -126,80 +132,13 @@ class DelayCalculatorUnitTest extends PHPUnitTestCase
             false,
             true,
         );
-        self::assertNull($delayCalculator->getBaseDelay(1));
-        self::assertSame(1, $delayCalculator->getBaseDelay(2));
-        self::assertSame(0, $delayCalculator->getBaseDelay(3));
-        self::assertSame(3, $delayCalculator->getBaseDelay(4));
-        self::assertSame(0, $delayCalculator->getBaseDelay(5));
-        self::assertNull($delayCalculator->getBaseDelay(6));
+        self::assertNull($delayCalculator->getBaseDelay(0));
+        self::assertSame(1, $delayCalculator->getBaseDelay(1));
+        self::assertSame(0, $delayCalculator->getBaseDelay(2));
+        self::assertSame(3, $delayCalculator->getBaseDelay(3));
+        self::assertSame(0, $delayCalculator->getBaseDelay(4));
+        self::assertNull($delayCalculator->getBaseDelay(5));
     }
-
-
-
-//    /**
-//     * Test that the getBaseDelay() method applies unit rounding.
-//     *
-//     * @test
-//     *
-//     * @return void
-//     */
-//    public static function test_that_get_base_delay_applies_unit_rounding(): void
-//    {
-//        // seconds
-//        $delayCalculator = new DelayCalculator(
-//            new SequenceBackoffAlgorithm([1, 1.5, 4.5, 8.5]),
-//            new FullJitter(),
-//            null,
-//            null,
-//            Settings::UNIT_SECONDS,
-//            false,
-//            true,
-//        );
-//        self::assertNull($delayCalculator->getBaseDelay(1));
-//        self::assertSame(1, $delayCalculator->getBaseDelay(2));
-//        self::assertSame(1.5, $delayCalculator->getBaseDelay(3));
-//        self::assertSame(4.5, $delayCalculator->getBaseDelay(4));
-//        self::assertSame(8.5, $delayCalculator->getBaseDelay(5));
-//        self::assertNull($delayCalculator->getBaseDelay(6));
-//
-//
-//
-//        // milliseconds
-//        $delayCalculator = new DelayCalculator(
-//            new SequenceBackoffAlgorithm([1, 1.5, 4.5, 8.5]),
-//            new FullJitter(),
-//            null,
-//            null,
-//            Settings::UNIT_MILLISECONDS,
-//            false,
-//            true,
-//        );
-//        self::assertNull($delayCalculator->getBaseDelay(1));
-//        self::assertSame(1, $delayCalculator->getBaseDelay(2));
-//        self::assertSame(2, $delayCalculator->getBaseDelay(3));
-//        self::assertSame(5, $delayCalculator->getBaseDelay(4));
-//        self::assertSame(9, $delayCalculator->getBaseDelay(5));
-//        self::assertNull($delayCalculator->getBaseDelay(6));
-//
-//
-//
-//        // microseconds
-//        $delayCalculator = new DelayCalculator(
-//            new SequenceBackoffAlgorithm([1, 1.5, 4.5, 8.5]),
-//            new FullJitter(),
-//            null,
-//            null,
-//            Settings::UNIT_MICROSECONDS,
-//            false,
-//            true,
-//        );
-//        self::assertNull($delayCalculator->getBaseDelay(1));
-//        self::assertSame(1, $delayCalculator->getBaseDelay(2));
-//        self::assertSame(2, $delayCalculator->getBaseDelay(3));
-//        self::assertSame(5, $delayCalculator->getBaseDelay(4));
-//        self::assertSame(9, $delayCalculator->getBaseDelay(5));
-//        self::assertNull($delayCalculator->getBaseDelay(6));
-//    }
 
 
 
@@ -210,6 +149,7 @@ class DelayCalculatorUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public static function test_that_get_base_delay_applies_immediate_first_retry(): void
     {
         $delayCalculator = new DelayCalculator(
@@ -221,13 +161,13 @@ class DelayCalculatorUnitTest extends PHPUnitTestCase
             true,
             true,
         );
-        self::assertNull($delayCalculator->getBaseDelay(1));
-        self::assertSame(0, $delayCalculator->getBaseDelay(2));
-        self::assertSame(1, $delayCalculator->getBaseDelay(3));
-        self::assertSame(1.5, $delayCalculator->getBaseDelay(4));
-        self::assertSame(4, $delayCalculator->getBaseDelay(5));
-        self::assertSame(8, $delayCalculator->getBaseDelay(6));
-        self::assertNull($delayCalculator->getBaseDelay(7));
+        self::assertNull($delayCalculator->getBaseDelay(0));
+        self::assertSame(0, $delayCalculator->getBaseDelay(1));
+        self::assertSame(1, $delayCalculator->getBaseDelay(2));
+        self::assertSame(1.5, $delayCalculator->getBaseDelay(3));
+        self::assertSame(4, $delayCalculator->getBaseDelay(4));
+        self::assertSame(8, $delayCalculator->getBaseDelay(5));
+        self::assertNull($delayCalculator->getBaseDelay(6));
 
 
 
@@ -241,13 +181,13 @@ class DelayCalculatorUnitTest extends PHPUnitTestCase
             true,
             true,
         );
-        self::assertNull($delayCalculator->getBaseDelay(1));
-        self::assertSame(0, $delayCalculator->getBaseDelay(2));
-        self::assertSame(2, $delayCalculator->getBaseDelay(3));
-        self::assertSame(4, $delayCalculator->getBaseDelay(4));
-        self::assertSame(6, $delayCalculator->getBaseDelay(5));
-        self::assertSame(8, $delayCalculator->getBaseDelay(6));
-        self::assertSame(10, $delayCalculator->getBaseDelay(7));
+        self::assertNull($delayCalculator->getBaseDelay(0));
+        self::assertSame(0, $delayCalculator->getBaseDelay(1));
+        self::assertSame(2, $delayCalculator->getBaseDelay(2));
+        self::assertSame(4, $delayCalculator->getBaseDelay(3));
+        self::assertSame(6, $delayCalculator->getBaseDelay(4));
+        self::assertSame(8, $delayCalculator->getBaseDelay(5));
+        self::assertSame(10, $delayCalculator->getBaseDelay(6));
     }
 
 
@@ -259,6 +199,7 @@ class DelayCalculatorUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public static function test_that_get_base_when_delays_are_disabled(): void
     {
         $delayCalculator = new DelayCalculator(
@@ -270,12 +211,12 @@ class DelayCalculatorUnitTest extends PHPUnitTestCase
             false,
             false,
         );
-        self::assertNull($delayCalculator->getBaseDelay(1));
+        self::assertNull($delayCalculator->getBaseDelay(0));
+        self::assertSame(0, $delayCalculator->getBaseDelay(1));
         self::assertSame(0, $delayCalculator->getBaseDelay(2));
         self::assertSame(0, $delayCalculator->getBaseDelay(3));
         self::assertSame(0, $delayCalculator->getBaseDelay(4));
         self::assertSame(0, $delayCalculator->getBaseDelay(5));
-        self::assertSame(0, $delayCalculator->getBaseDelay(6));
 
 
 
@@ -289,12 +230,12 @@ class DelayCalculatorUnitTest extends PHPUnitTestCase
             false,
             false,
         );
-        self::assertNull($delayCalculator->getBaseDelay(1));
+        self::assertNull($delayCalculator->getBaseDelay(0));
+        self::assertSame(0, $delayCalculator->getBaseDelay(1));
         self::assertSame(0, $delayCalculator->getBaseDelay(2));
         self::assertSame(0, $delayCalculator->getBaseDelay(3));
         self::assertSame(0, $delayCalculator->getBaseDelay(4));
-        self::assertSame(0, $delayCalculator->getBaseDelay(5));
-        self::assertNull($delayCalculator->getBaseDelay(6));
+        self::assertNull($delayCalculator->getBaseDelay(5));
     }
 
 
@@ -308,6 +249,7 @@ class DelayCalculatorUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public function test_that_get_jittered_doesnt_apply_jitter_when_its_not_used(): void
     {
         $delayCalculator = new DelayCalculator(
@@ -319,12 +261,12 @@ class DelayCalculatorUnitTest extends PHPUnitTestCase
             false,
             true,
         );
-        self::assertNull($delayCalculator->getJitteredDelay(1));
-        self::assertSame(1, $delayCalculator->getJitteredDelay(2));
-        self::assertSame(1.5, $delayCalculator->getJitteredDelay(3));
-        self::assertSame(4, $delayCalculator->getJitteredDelay(4));
-        self::assertSame(8, $delayCalculator->getJitteredDelay(5));
-        self::assertNull($delayCalculator->getJitteredDelay(6));
+        self::assertNull($delayCalculator->getJitteredDelay(0));
+        self::assertSame(1, $delayCalculator->getJitteredDelay(1));
+        self::assertSame(1.5, $delayCalculator->getJitteredDelay(2));
+        self::assertSame(4, $delayCalculator->getJitteredDelay(3));
+        self::assertSame(8, $delayCalculator->getJitteredDelay(4));
+        self::assertNull($delayCalculator->getJitteredDelay(5));
 
 
 
@@ -338,12 +280,12 @@ class DelayCalculatorUnitTest extends PHPUnitTestCase
             false,
             true
         );
-        self::assertNull($delayCalculator->getJitteredDelay(1));
+        self::assertNull($delayCalculator->getJitteredDelay(0));
+        self::assertSame($delayCalculator->getBaseDelay(0), $delayCalculator->getJitteredDelay(0));
         self::assertSame($delayCalculator->getBaseDelay(1), $delayCalculator->getJitteredDelay(1));
         self::assertSame($delayCalculator->getBaseDelay(2), $delayCalculator->getJitteredDelay(2));
         self::assertSame($delayCalculator->getBaseDelay(3), $delayCalculator->getJitteredDelay(3));
         self::assertSame($delayCalculator->getBaseDelay(4), $delayCalculator->getJitteredDelay(4));
-        self::assertSame($delayCalculator->getBaseDelay(5), $delayCalculator->getJitteredDelay(5));
 
 
 
@@ -357,12 +299,12 @@ class DelayCalculatorUnitTest extends PHPUnitTestCase
             false,
             true,
         );
-        self::assertNull($delayCalculator->getJitteredDelay(1));
-        self::assertSame(1.1, $delayCalculator->getJitteredDelay(2));
-        self::assertSame(0, $delayCalculator->getJitteredDelay(3));
-        self::assertSame(2.1, $delayCalculator->getJitteredDelay(4));
-        self::assertSame(0, $delayCalculator->getJitteredDelay(5));
-        self::assertNull($delayCalculator->getJitteredDelay(6));
+        self::assertNull($delayCalculator->getJitteredDelay(0));
+        self::assertSame(1.1, $delayCalculator->getJitteredDelay(1));
+        self::assertSame(0, $delayCalculator->getJitteredDelay(2));
+        self::assertSame(2.1, $delayCalculator->getJitteredDelay(3));
+        self::assertSame(0, $delayCalculator->getJitteredDelay(4));
+        self::assertNull($delayCalculator->getJitteredDelay(5));
     }
 
     /**
@@ -372,6 +314,7 @@ class DelayCalculatorUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public function test_that_get_jittered_delay_returns_the_same_results_each_time(): void
     {
         $delayCalculator = new DelayCalculator(
@@ -384,19 +327,19 @@ class DelayCalculatorUnitTest extends PHPUnitTestCase
             true,
         );
 
-        self::assertNull($delayCalculator->getJitteredDelay(1));
+        self::assertNull($delayCalculator->getJitteredDelay(0));
 
-        $delay1a = $delayCalculator->getJitteredDelay(2);
-        $delay1b = $delayCalculator->getJitteredDelay(2);
-        $delay1c = $delayCalculator->getJitteredDelay(2);
+        $delay1a = $delayCalculator->getJitteredDelay(1);
+        $delay1b = $delayCalculator->getJitteredDelay(1);
+        $delay1c = $delayCalculator->getJitteredDelay(1);
         self::assertNotSame(1, $delay1a);
         self::assertIsFloat($delay1a);
         self::assertSame($delay1a, $delay1b);
         self::assertSame($delay1a, $delay1c);
 
-        $delay2a = $delayCalculator->getJitteredDelay(3);
-        $delay2b = $delayCalculator->getJitteredDelay(3);
-        $delay2c = $delayCalculator->getJitteredDelay(3);
+        $delay2a = $delayCalculator->getJitteredDelay(2);
+        $delay2b = $delayCalculator->getJitteredDelay(2);
+        $delay2c = $delayCalculator->getJitteredDelay(2);
         self::assertNotSame(1, $delay2a);
         self::assertIsFloat($delay2a);
         self::assertSame($delay2a, $delay2b);
@@ -412,6 +355,7 @@ class DelayCalculatorUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public static function test_that_get_jittered_delay_applies_lower_bound(): void
     {
         // test when jitter returns a value less than 0
@@ -424,7 +368,7 @@ class DelayCalculatorUnitTest extends PHPUnitTestCase
             false,
             true,
         );
-        self::assertSame(0, $delayCalculator->getJitteredDelay(2));
+        self::assertSame(0, $delayCalculator->getJitteredDelay(1));
 
         // test when jitter returns a value greater than 1
         $delayCalculator = new DelayCalculator(
@@ -436,75 +380,8 @@ class DelayCalculatorUnitTest extends PHPUnitTestCase
             false,
             true,
         );
-        self::assertSame(1.001, $delayCalculator->getJitteredDelay(2));
+        self::assertSame(1.001, $delayCalculator->getJitteredDelay(1));
     }
-
-
-
-//    /**
-//     * Test that the getJitteredDelay() method applies unit rounding.
-//     *
-//     * @test
-//     *
-//     * @return void
-//     */
-//    public static function test_that_get_jittered_delay_applies_unit_rounding(): void
-//    {
-//        // seconds
-//        $delayCalculator = new DelayCalculator(
-//            new SequenceBackoffAlgorithm([1, 1.5, 4.5, 8.3]),
-//            new CallbackJitter(fn(int|float $delay, int $retryNumber) => $delay + 0.1),
-//            null,
-//            null,
-//            Settings::UNIT_SECONDS,
-//            false,
-//            true,
-//        );
-//        self::assertNull($delayCalculator->getJitteredDelay(1));
-//        self::assertSame(1.1, $delayCalculator->getJitteredDelay(2));
-//        self::assertSame(1.6, $delayCalculator->getJitteredDelay(3));
-//        self::assertSame(4.6, $delayCalculator->getJitteredDelay(4));
-//        self::assertSame(8.4, $delayCalculator->getJitteredDelay(5));
-//        self::assertNull($delayCalculator->getJitteredDelay(6));
-//
-//
-//
-//        // milliseconds
-//        $delayCalculator = new DelayCalculator(
-//            new SequenceBackoffAlgorithm([1, 1.5, 4.5, 8.3]),
-//            new CallbackJitter(fn(int|float $delay, int $retryNumber) => $delay + 0.1),
-//            null,
-//            null,
-//            Settings::UNIT_MILLISECONDS,
-//            false,
-//            true,
-//        );
-//        self::assertNull($delayCalculator->getJitteredDelay(1));
-//        self::assertSame(1, $delayCalculator->getJitteredDelay(2));
-//        self::assertSame(2, $delayCalculator->getJitteredDelay(3));
-//        self::assertSame(5, $delayCalculator->getJitteredDelay(4));
-//        self::assertSame(8, $delayCalculator->getJitteredDelay(5));
-//        self::assertNull($delayCalculator->getJitteredDelay(6));
-//
-//
-//
-//        // microseconds
-//        $delayCalculator = new DelayCalculator(
-//            new SequenceBackoffAlgorithm([1, 1.5, 4.5, 8.3]),
-//            new CallbackJitter(fn(int|float $delay, int $retryNumber) => $delay + 0.1),
-//            null,
-//            null,
-//            Settings::UNIT_MICROSECONDS,
-//            false,
-//            true,
-//        );
-//        self::assertNull($delayCalculator->getJitteredDelay(1));
-//        self::assertSame(1, $delayCalculator->getJitteredDelay(2));
-//        self::assertSame(2, $delayCalculator->getJitteredDelay(3));
-//        self::assertSame(5, $delayCalculator->getJitteredDelay(4));
-//        self::assertSame(8, $delayCalculator->getJitteredDelay(5));
-//        self::assertNull($delayCalculator->getJitteredDelay(6));
-//    }
 
 
 
@@ -517,9 +394,10 @@ class DelayCalculatorUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public static function test_that_max_attempts_are_applied(): void
     {
-        // when maxAttempts is null
+        // when maxRetries is null
         $delayCalculator = new DelayCalculator(
             new NoopBackoffAlgorithm(),
             new FullJitter(),
@@ -529,30 +407,30 @@ class DelayCalculatorUnitTest extends PHPUnitTestCase
             false,
             true,
         );
-        for ($count = 1; $count <= 1000; $count++) {
-            $expected = $count == 1
+        for ($count = 0; $count < 1000; $count++) {
+            $expected = $count == 0
                 ? null
                 : 0;
             self::assertSame($expected, $delayCalculator->getBaseDelay($count));
         }
 
-        // when maxAttempts is set
-        $maxAttempts = mt_rand(0, 990);
+        // when maxRetries is set
+        $maxRetries = mt_rand(0, 990);
         $delayCalculator = new DelayCalculator(
             new NoopBackoffAlgorithm(),
             new FullJitter(),
-            $maxAttempts,
+            $maxRetries,
             null,
             Settings::UNIT_SECONDS,
             false,
             true,
         );
-        for ($count = 1; $count <= 1000; $count++) {
+        for ($count = 0; $count < 1000; $count++) {
 
-            $expected = ($count == 1)
+            $expected = ($count == 0)
                 ? null
                 : 0;
-            $expected = ($count <= $maxAttempts)
+            $expected = ($count <= $maxRetries)
                 ? $expected
                 : null;
 
@@ -571,6 +449,7 @@ class DelayCalculatorUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public function test_that_should_stop_returns_the_correct_result(): void
     {
         $delayCalculator = new DelayCalculator(
@@ -582,16 +461,16 @@ class DelayCalculatorUnitTest extends PHPUnitTestCase
             false,
             true,
         );
+        self::assertFalse($delayCalculator->shouldStop(0));
         self::assertFalse($delayCalculator->shouldStop(1));
         self::assertFalse($delayCalculator->shouldStop(2));
         self::assertFalse($delayCalculator->shouldStop(3));
         self::assertFalse($delayCalculator->shouldStop(4));
-        self::assertFalse($delayCalculator->shouldStop(5));
+        self::assertTrue($delayCalculator->shouldStop(5));
         self::assertTrue($delayCalculator->shouldStop(6));
         self::assertTrue($delayCalculator->shouldStop(7));
         self::assertTrue($delayCalculator->shouldStop(8));
         self::assertTrue($delayCalculator->shouldStop(9));
-        self::assertTrue($delayCalculator->shouldStop(10));
     }
 
 
@@ -603,6 +482,7 @@ class DelayCalculatorUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public static function test_that_reset_resets_so_it_generates_new_numbers(): void
     {
         $delayCalculator = new DelayCalculator(
@@ -616,51 +496,51 @@ class DelayCalculatorUnitTest extends PHPUnitTestCase
         );
 
         $delays1a = [
+            $delayCalculator->getBaseDelay(0),
             $delayCalculator->getBaseDelay(1),
             $delayCalculator->getBaseDelay(2),
             $delayCalculator->getBaseDelay(3),
             $delayCalculator->getBaseDelay(4),
-            $delayCalculator->getBaseDelay(5),
         ];
         $jittered1a = [
+            $delayCalculator->getJitteredDelay(0),
             $delayCalculator->getJitteredDelay(1),
             $delayCalculator->getJitteredDelay(2),
             $delayCalculator->getJitteredDelay(3),
             $delayCalculator->getJitteredDelay(4),
-            $delayCalculator->getJitteredDelay(5),
         ];
 
         $delays1b = [
+            $delayCalculator->getBaseDelay(0),
             $delayCalculator->getBaseDelay(1),
             $delayCalculator->getBaseDelay(2),
             $delayCalculator->getBaseDelay(3),
             $delayCalculator->getBaseDelay(4),
-            $delayCalculator->getBaseDelay(5),
         ];
         $jittered1b = [
+            $delayCalculator->getJitteredDelay(0),
             $delayCalculator->getJitteredDelay(1),
             $delayCalculator->getJitteredDelay(2),
             $delayCalculator->getJitteredDelay(3),
             $delayCalculator->getJitteredDelay(4),
-            $delayCalculator->getJitteredDelay(5),
         ];
 
         // test ->reset() chaining
         self::assertSame($delayCalculator, $delayCalculator->reset());
 
         $delays2a = [
+            $delayCalculator->getBaseDelay(0),
             $delayCalculator->getBaseDelay(1),
             $delayCalculator->getBaseDelay(2),
             $delayCalculator->getBaseDelay(3),
             $delayCalculator->getBaseDelay(4),
-            $delayCalculator->getBaseDelay(5),
         ];
         $jittered2a = [
+            $delayCalculator->getJitteredDelay(0),
             $delayCalculator->getJitteredDelay(1),
             $delayCalculator->getJitteredDelay(2),
             $delayCalculator->getJitteredDelay(3),
             $delayCalculator->getJitteredDelay(4),
-            $delayCalculator->getJitteredDelay(5),
         ];
 
         self::assertSame($delays1a, $delays1b);
@@ -681,6 +561,7 @@ class DelayCalculatorUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public function test_that_delay_calculator_throws_an_exception_due_to_invalid_unit_type(): void
     {
         $this->expectException(BackoffInitialisationException::class);

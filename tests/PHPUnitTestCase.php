@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodeDistortion\Backoff\Tests;
 
 use PHPUnit\Framework\TestCase;

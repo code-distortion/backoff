@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodeDistortion\Backoff\Tests\Unit;
 
 use CodeDistortion\Backoff\AttemptLog;
@@ -15,6 +17,9 @@ use CodeDistortion\Backoff\Tests\Unit\Support\OtherExcptn2;
 use CodeDistortion\Backoff\Tests\Unit\Support\OtherExcptn3;
 use DateTime;
 use Exception;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Test;
+use stdClass;
 use Throwable;
 
 /**
@@ -54,6 +59,8 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
      *                                                                                           error).
      * @return void
      */
+    #[Test]
+    #[DataProvider('backoffRetryExceptionsDataProvider')]
     public static function test_that_backoff_catches_exceptions_and_retries_because_of_them(
         callable $attempt,
         bool $resetCatchAllExcptn,
@@ -110,7 +117,8 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
     /**
      * DataProvider for test_that_backoff_catches_exceptions_and_retries_because_of_them.
      *
-     * @return array[]
+     * @return array<string,array<string,callable|boolean|class-string|array<class-string|callable>|boolean|null|int|Throwable|boolean>>
+     * @throws Exception Doesn't actually throw this, however phpcs expects it.
      */
     public static function backoffRetryExceptionsDataProvider(): array
     {
@@ -137,7 +145,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'retryExceptions2' => null,
                 'expectedAttempts' => 1,
                 'expectedResult' => $randInt,
-                'expectToRethrow' => null,
+                'expectedException' => null,
                 'expectRuntimeExcptn' => false,
             ],
             'successful attempt - catch false' => [
@@ -147,7 +155,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'retryExceptions2' => null,
                 'expectedAttempts' => 1,
                 'expectedResult' => $randInt,
-                'expectToRethrow' => null,
+                'expectedException' => null,
                 'expectRuntimeExcptn' => false,
             ],
             'successful attempt - catch all' => [
@@ -157,7 +165,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'retryExceptions2' => null,
                 'expectedAttempts' => 1,
                 'expectedResult' => $randInt,
-                'expectToRethrow' => null,
+                'expectedException' => null,
                 'expectRuntimeExcptn' => false,
             ],
             'successful attempt - catch all 2' => [
@@ -167,7 +175,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'retryExceptions2' => null,
                 'expectedAttempts' => 1,
                 'expectedResult' => $randInt,
-                'expectToRethrow' => null,
+                'expectedException' => null,
                 'expectRuntimeExcptn' => false,
             ],
             'successful attempt - catch OtherExcptn1' => [
@@ -177,7 +185,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'retryExceptions2' => null,
                 'expectedAttempts' => 1,
                 'expectedResult' => $randInt,
-                'expectToRethrow' => null,
+                'expectedException' => null,
                 'expectRuntimeExcptn' => false,
             ],
             'successful attempt - catch BackoffException' => [
@@ -187,7 +195,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'retryExceptions2' => null,
                 'expectedAttempts' => 1,
                 'expectedResult' => $randInt,
-                'expectToRethrow' => null,
+                'expectedException' => null,
                 'expectRuntimeExcptn' => false,
             ],
             'successful attempt - catch via callback returning true' => [
@@ -197,7 +205,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'retryExceptions2' => null,
                 'expectedAttempts' => 1,
                 'expectedResult' => $randInt,
-                'expectToRethrow' => null,
+                'expectedException' => null,
                 'expectRuntimeExcptn' => false,
             ],
             'successful attempt - catch via callback returning false' => [
@@ -207,7 +215,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'retryExceptions2' => null,
                 'expectedAttempts' => 1,
                 'expectedResult' => $randInt,
-                'expectToRethrow' => null,
+                'expectedException' => null,
                 'expectRuntimeExcptn' => false,
             ],
 
@@ -222,7 +230,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'retryExceptions2' => null,
                 'expectedAttempts' => 1,
                 'expectedResult' => null,
-                'expectToRethrow' => $backoffException,
+                'expectedException' => $backoffException,
                 'expectRuntimeExcptn' => false,
             ],
             'unsuccessful attempts - catch false' => [
@@ -232,7 +240,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'retryExceptions2' => null,
                 'expectedAttempts' => 1,
                 'expectedResult' => null,
-                'expectToRethrow' => $backoffException,
+                'expectedException' => $backoffException,
                 'expectRuntimeExcptn' => false,
             ],
             'unsuccessful attempts - catch all' => [
@@ -242,7 +250,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'retryExceptions2' => null,
                 'expectedAttempts' => 5,
                 'expectedResult' => null,
-                'expectToRethrow' => $backoffException,
+                'expectedException' => $backoffException,
                 'expectRuntimeExcptn' => false,
             ],
             'unsuccessful attempts - catch all 2' => [
@@ -252,7 +260,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'retryExceptions2' => null,
                 'expectedAttempts' => 5,
                 'expectedResult' => null,
-                'expectToRethrow' => $backoffException,
+                'expectedException' => $backoffException,
                 'expectRuntimeExcptn' => false,
             ],
             'unsuccessful attempts - catch OtherExcptn1' => [
@@ -262,7 +270,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'retryExceptions2' => null,
                 'expectedAttempts' => 1,
                 'expectedResult' => null,
-                'expectToRethrow' => $backoffException,
+                'expectedException' => $backoffException,
                 'expectRuntimeExcptn' => false,
             ],
             'unsuccessful attempts - catch BackoffException' => [
@@ -272,7 +280,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'retryExceptions2' => null,
                 'expectedAttempts' => 5,
                 'expectedResult' => null,
-                'expectToRethrow' => $backoffException,
+                'expectedException' => $backoffException,
                 'expectRuntimeExcptn' => false,
             ],
             'unsuccessful attempts - catch via callback returning true' => [
@@ -282,7 +290,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'retryExceptions2' => null,
                 'expectedAttempts' => 5,
                 'expectedResult' => null,
-                'expectToRethrow' => $backoffException,
+                'expectedException' => $backoffException,
                 'expectRuntimeExcptn' => false,
             ],
             'unsuccessful attempts - catch via callback returning false' => [
@@ -292,7 +300,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'retryExceptions2' => null,
                 'expectedAttempts' => 1,
                 'expectedResult' => null,
-                'expectToRethrow' => $regularException,
+                'expectedException' => $regularException,
                 'expectRuntimeExcptn' => false,
             ],
 
@@ -307,7 +315,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'retryExceptions2' => null,
                 'expectedAttempts' => 1,
                 'expectedResult' => null,
-                'expectToRethrow' => $backoffException,
+                'expectedException' => $backoffException,
                 'expectRuntimeExcptn' => false,
             ],
             'successful attempt after 3 - catch false' => [
@@ -317,7 +325,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'retryExceptions2' => null,
                 'expectedAttempts' => 1,
                 'expectedResult' => null,
-                'expectToRethrow' => $backoffException,
+                'expectedException' => $backoffException,
                 'expectRuntimeExcptn' => false,
             ],
             'successful attempt after 3 - catch all' => [
@@ -327,7 +335,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'retryExceptions2' => null,
                 'expectedAttempts' => 3,
                 'expectedResult' => $randInt,
-                'expectToRethrow' => null,
+                'expectedException' => null,
                 'expectRuntimeExcptn' => false,
             ],
             'successful attempt after 3 - catch all 2' => [
@@ -337,7 +345,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'retryExceptions2' => null,
                 'expectedAttempts' => 3,
                 'expectedResult' => $randInt,
-                'expectToRethrow' => null,
+                'expectedException' => null,
                 'expectRuntimeExcptn' => false,
             ],
             'successful attempt after 3 - catch OtherExcptn1' => [
@@ -347,7 +355,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'retryExceptions2' => null,
                 'expectedAttempts' => 1,
                 'expectedResult' => null,
-                'expectToRethrow' => $backoffException,
+                'expectedException' => $backoffException,
                 'expectRuntimeExcptn' => false,
             ],
             'successful attempt after 3 - catch BackoffException' => [
@@ -357,7 +365,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'retryExceptions2' => null,
                 'expectedAttempts' => 3,
                 'expectedResult' => $randInt,
-                'expectToRethrow' => null,
+                'expectedException' => null,
                 'expectRuntimeExcptn' => false,
             ],
             'successful attempt after 3 - catch via callback returning true' => [
@@ -367,7 +375,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'retryExceptions2' => null,
                 'expectedAttempts' => 3,
                 'expectedResult' => $randInt,
-                'expectToRethrow' => null,
+                'expectedException' => null,
                 'expectRuntimeExcptn' => false,
             ],
             'successful attempt after 3 - catch via callback returning false' => [
@@ -377,7 +385,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'retryExceptions2' => null,
                 'expectedAttempts' => 1,
                 'expectedResult' => null,
-                'expectToRethrow' => $regularException,
+                'expectedException' => $regularException,
                 'expectRuntimeExcptn' => false,
             ],
 
@@ -393,7 +401,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'retryExceptions2' => null,
                 'expectedAttempts' => 1,
                 'expectedResult' => null,
-                'expectToRethrow' => $backoffException,
+                'expectedException' => $backoffException,
                 'expectRuntimeExcptn' => false,
             ],
             'unsuccessful attempts - catch OtherExcptn1 and BackoffException' => [
@@ -403,7 +411,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'retryExceptions2' => null,
                 'expectedAttempts' => 5,
                 'expectedResult' => null,
-                'expectToRethrow' => $backoffException,
+                'expectedException' => $backoffException,
                 'expectRuntimeExcptn' => false,
             ],
 
@@ -416,7 +424,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'retryExceptions2' => null,
                 'expectedAttempts' => 1,
                 'expectedResult' => null,
-                'expectToRethrow' => $backoffException,
+                'expectedException' => $backoffException,
                 'expectRuntimeExcptn' => false,
             ],
             'unsuccessful attempts - catch OtherExcptn1, OtherExcptn2 and BackoffException' => [
@@ -426,7 +434,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'retryExceptions2' => null,
                 'expectedAttempts' => 5,
                 'expectedResult' => null,
-                'expectToRethrow' => $backoffException,
+                'expectedException' => $backoffException,
                 'expectRuntimeExcptn' => false,
             ],
             'unsuccessful attempts - catch OtherExcptn1, OtherExcptn2 and callback returning false' => [
@@ -436,7 +444,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'retryExceptions2' => null,
                 'expectedAttempts' => 1,
                 'expectedResult' => null,
-                'expectToRethrow' => $regularException,
+                'expectedException' => $regularException,
                 'expectRuntimeExcptn' => false,
             ],
             'unsuccessful attempts - catch OtherExcptn1, OtherExcptn2 and callback returning true' => [
@@ -446,7 +454,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'retryExceptions2' => null,
                 'expectedAttempts' => 5,
                 'expectedResult' => null,
-                'expectToRethrow' => $backoffException,
+                'expectedException' => $backoffException,
                 'expectRuntimeExcptn' => false,
             ],
 
@@ -461,7 +469,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'retryExceptions2' => [OtherExcptn2::class],
                 'expectedAttempts' => 1,
                 'expectedResult' => null,
-                'expectToRethrow' => $backoffException,
+                'expectedException' => $backoffException,
                 'expectRuntimeExcptn' => false,
             ],
             'unsuccessful attempts - catch OtherExcptn1, OtherExcptn2 and BackoffException, defined diff times' => [
@@ -471,7 +479,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'retryExceptions2' => [OtherExcptn2::class, BackoffException::class],
                 'expectedAttempts' => 5,
                 'expectedResult' => null,
-                'expectToRethrow' => $backoffException,
+                'expectedException' => $backoffException,
                 'expectRuntimeExcptn' => false,
             ],
             'unsuccessful attempts - catch BackoffException, OtherExcptn1, defined diff times' => [
@@ -481,7 +489,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'retryExceptions2' => OtherExcptn1::class,
                 'expectedAttempts' => 5,
                 'expectedResult' => null,
-                'expectToRethrow' => $backoffException,
+                'expectedException' => $backoffException,
                 'expectRuntimeExcptn' => false,
             ],
             'unsuccessful attempts - catch OtherExcptn1, then all, diff times' => [
@@ -491,7 +499,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'retryExceptions2' => [], // <<< catch all exceptions again
                 'expectedAttempts' => 5,
                 'expectedResult' => null,
-                'expectToRethrow' => $backoffException,
+                'expectedException' => $backoffException,
                 'expectRuntimeExcptn' => false,
             ],
             'unsuccessful attempts - catch BackoffException, then false, diff times' => [
@@ -501,7 +509,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'retryExceptions2' => false, // <<< reset and don't catch exceptions
                 'expectedAttempts' => 1,
                 'expectedResult' => null,
-                'expectToRethrow' => $backoffException,
+                'expectedException' => $backoffException,
                 'expectRuntimeExcptn' => false,
             ],
         ];
@@ -526,6 +534,8 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
      * @param mixed      $expectedResult       The expected return value.
      * @return void
      */
+    #[Test]
+    #[DataProvider('backoffRetryWhenResponseDataProvider')]
     public static function test_that_backoff_checks_for_invalid_retry_when_values_and_retries_because_of_them(
         callable $attempt,
         mixed $invalidValues1,
@@ -562,7 +572,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
     /**
      * DataProvider for test_that_backoff_check_for_invalid_values_and_retries_because_of_them.
      *
-     * @return array[]
+     * @return array<string,array<string,callable|integer|boolean|null|mixed>>
      */
     public static function backoffRetryWhenResponseDataProvider(): array
     {
@@ -719,6 +729,8 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
      * @param mixed      $expectedResult     The expected return value.
      * @return void
      */
+    #[Test]
+    #[DataProvider('backoffRetryUntilResponseDataProvider')]
     public static function test_that_backoff_checks_for_invalid_retry_until_values_and_retries_because_of_them(
         callable $attempt,
         mixed $validValues1,
@@ -755,7 +767,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
     /**
      * DataProvider for test_that_backoff_check_for_invalid_values_and_retries_because_of_them.
      *
-     * @return array[]
+     * @return array<string,array<string,callable|integer|boolean|null|mixed>>
      */
     public static function backoffRetryUntilResponseDataProvider(): array
     {
@@ -917,6 +929,8 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
      * @param Throwable|null $expectedException     The expected exception to be caught.
      * @return void
      */
+    #[Test]
+    #[DataProvider('backoffRethrowDataProvider')]
     public static function test_what_backoff_returns(
         callable $attempt,
         ?bool $checkForExceptions,
@@ -968,7 +982,8 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
     /**
      * DataProvider for test_that_backoff_rethrows_the_last_exception.
      *
-     * @return array[]
+     * @return array<string,array<string,boolean|int|float|string|array<integer>|stdClass|callable>>
+     * @throws Exception Doesn't actually throw this, however phpcs expects it.
      */
     public static function backoffRethrowDataProvider(): array
     {
@@ -1003,7 +1018,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 'useAttemptDefault' => false,
                 'attemptDefault' => null,
                 'expectedResult' => null,
-                'expectToRethrow' => null,
+                'expectedException' => null,
             ];
 
             $return = [
@@ -1179,7 +1194,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 // throws exception: 0
                 "throws exception $type" => [
                     'attempt' => fn() => throw $backoffException,
-                    'expectToRethrow' => $backoffException,
+                    'expectedException' => $backoffException,
                 ],
 
                 // throws exception: 1
@@ -1187,7 +1202,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                     'attempt' => fn() => throw $backoffException,
                     'checkForExceptions' => true,
                     'useExceptionDefault' => false,
-                    'expectToRethrow' => $backoffException,
+                    'expectedException' => $backoffException,
                 ],
                 "throws exception $type: (check for exp + exp default)" => [
                     'attempt' => fn() => throw $backoffException,
@@ -1201,14 +1216,14 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 "throws exception $type: (check result)" => [
                     'attempt' => fn() => throw $backoffException,
                     'checkForInvalidValues' => true,
-                    'expectToRethrow' => $backoffException,
+                    'expectedException' => $backoffException,
                 ],
                 "throws exception $type: (check result + \"return\" default)" => [
                     'attempt' => fn() => throw $backoffException,
                     'checkForInvalidValues' => true,
                     'useReturnDefault' => true,
                     'returnDefault' => $retryUntilVal,
-                    'expectToRethrow' => $backoffException,
+                    'expectedException' => $backoffException,
                 ],
 
                 // throws exception: 3
@@ -1225,7 +1240,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                     'checkForExceptions' => true,
                     'useExceptionDefault' => false,
                     'checkForInvalidValues' => true,
-                    'expectToRethrow' => $backoffException,
+                    'expectedException' => $backoffException,
                 ],
                 "throws exception $type: (check for exp + exp default) (check result)" => [
                     'attempt' => fn() => throw $backoffException,
@@ -1242,7 +1257,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                     'checkForInvalidValues' => true,
                     'useReturnDefault' => true,
                     'returnDefault' => $retryUntilVal,
-                    'expectToRethrow' => $backoffException,
+                    'expectedException' => $backoffException,
                 ],
                 "throws exception $type: (check for exp + exp default) (check result + \"return\" default)" => [
                     'attempt' => fn() => throw $backoffException,
@@ -1520,6 +1535,8 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
     private static function generateRandomValueOfType(string $type): mixed
     {
         $callableRand = mt_rand();
+
+        /** @var 'bool'|'int'|'float'|'string'|'array'|'stdClass'|'callable' $type */
         return match ($type) {
             'bool' => (bool) mt_rand(0, 1),
             'int' => mt_rand(),
@@ -1538,13 +1555,16 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
     /**
      * Test that exceptions thrown by callbacks passed to ->retryExceptions(), are thrown.
      *
+     * @test
+     *
      * @return void
      */
+    #[Test]
     public static function test_that_retry_exceptions_exceptions_are_thrown(): void
     {
         $exception2 = new Exception('exception 2');
         $count = 0;
-        $callback = function(Throwable $e, AttemptLog $log) use(&$count, $exception2): bool {
+        $callback = function (Throwable $e, AttemptLog $log) use (&$count, $exception2): bool {
             $count++;
             throw $exception2;
         };
@@ -1566,364 +1586,14 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
 
 
 
-//    /**
-//     * Test that Backoff calls the exception callbacks correctly, based upon their parameter types.
-//     *
-//     * @test
-//     *
-//     * @return void
-//     */
-//    public static function test_that_backoff_calls_exception_callbacks(): void
-//    {
-//        $count1 = 0;
-//        $callback1 = function (Throwable $x) use (&$count1) {
-//            $count1++;
-//        };
-//
-//        // has a union type
-//        $count2 = 0;
-//        $callback2 = function (int|Throwable $e) use (&$count2) {
-//            $count2++;
-//        };
-//
-//        $count3 = 0;
-//        $callback3 = function (Throwable $e) use (&$count3) {
-//            $count3++;
-//        };
-//
-//        // has no parameters
-//        $count4 = 0;
-//        $callback4 = function () use (&$count4) {
-//            $count4++;
-//        };
-//
-//        // expects a BackoffException
-//        $count5 = 0;
-//        $callback5 = function (BackoffException $e) use (&$count5) {
-//            $count5++;
-//        };
-//
-//        // expects a BackoffInitialisationException (child of BackoffException)
-//        $count6 = 0;
-//        $callback6 = function (BackoffInitialisationException $e) use (&$count6) {
-//            $count6++;
-//        };
-//
-//        // will throw an error because its parameter is not a Throwable
-//        $callback7 = fn(SomeNonException $e) => true;
-//
-//        // will throw an error because it expects more than one parameter
-//        $callback8 = fn(Throwable $e, Throwable $e2) => true;
-//
-//        // will throw an error because it expects a non-exception parameter
-//        $callback9 = fn($e) => true;
-//
-//        // will throw an error because it expects a non-exception parameter
-//        $callback10 = fn(int $e) => true;
-//
-//        // an invokable class
-//        $invokableClass = new InvokableExceptionCallback();
-//
-//        // a callable
-//        $callable = [$invokableClass, '__invoke'];
-//
-//        // has a parameter with a union type hint that EXCLUDES Exceptions
-//        $callback11 = fn(Something|Other $e) => true;
-//
-//        // has a parameter with an intersection type hint that INCLUDES Exceptions - todo - how to test this in PHP 8.0?
-//        $count12 = 0;
-//        $callback12 = function (Throwable&Exception $e) use (&$count12) {
-//            $count12++;
-//        };
-//
-//        // has a parameter with an intersection type hint that EXCLUDES Exceptions - todo - how to test this in PHP 8.0?
-//        $callback13 = fn(This&That $e) => true;
-//
-//
-//
-//        // callUponException called once
-//        $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-//        $backoff = Backoff::noop()
-//            ->maxAttempts(2)
-//            ->retryExceptions()
-//            ->callUponException($callback1); // <<<
-//
-//        $backoff->attempt(fn() => throw new BackoffException(), null);
-//
-//        self::assertSame(2, $count1);
-//
-//
-//
-//        // callUponException called with an array
-//        $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-//        $backoff = Backoff::noop()
-//            ->maxAttempts(2)
-//            ->retryExceptions()
-//            ->callUponException([$callback1, $callback2]); // <<<
-//
-//        $backoff->attempt(fn() => throw new BackoffException(), null);
-//
-//        self::assertSame(2, $count1);
-//        self::assertSame(2, $count2);
-//
-//
-//
-//        // callUponException called with an array, and single callback
-//        $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-//        $backoff = Backoff::noop()
-//            ->maxAttempts(2)
-//            ->retryExceptions()
-//            ->callUponException([$callback1, $callback2], $callback3); // <<<
-//
-//        $backoff->attempt(fn() => throw new BackoffException(), null);
-//
-//        self::assertSame(2, $count1);
-//        self::assertSame(2, $count2);
-//        self::assertSame(2, $count3);
-//
-//
-//
-//        // callUponException called with an array and another array
-//        $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-//        $backoff = Backoff::noop()
-//            ->maxAttempts(2)
-//            ->retryExceptions()
-//            ->callUponException([$callback1], [$callback2, $callback3]); // <<<
-//
-//        $backoff->attempt(fn() => throw new BackoffException(), null);
-//
-//        self::assertSame(2, $count1);
-//        self::assertSame(2, $count2);
-//        self::assertSame(2, $count3);
-//
-//
-//
-//        // callUponException called several times
-//        $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-//        $backoff = Backoff::noop()
-//            ->maxAttempts(2)
-//            ->retryExceptions()
-//            ->callUponException($callback1) // <<<
-//            ->callUponException([$callback2, $callback3]); // <<<
-//
-//        $backoff->attempt(fn() => throw new BackoffException(), null);
-//
-//        self::assertSame(2, $count1);
-//        self::assertSame(2, $count2);
-//        self::assertSame(2, $count3);
-//
-//
-//
-//        // a callback passed that has no parameters
-//        $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-//        $backoff = Backoff::noop()
-//            ->maxAttempts(2)
-//            ->retryExceptions()
-//            ->callUponException($callback1, $callback4); // <<<
-//
-//        $backoff->attempt(fn() => throw new BackoffException(), null);
-//
-//        self::assertSame(2, $count1);
-//        self::assertSame(2, $count4);
-//
-//
-//
-//        // a callback passed that expects a BackoffException to be passed
-//        $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-//        $backoff = Backoff::noop()
-//            ->maxAttempts(2)
-//            ->retryExceptions()
-//            ->callUponException($callback1, $callback5); // <<<
-//
-//        $backoff->attempt(fn() => throw new BackoffException(), null);
-//
-//        self::assertSame(2, $count1);
-//        self::assertSame(2, $count5);
-//
-//
-//
-//        // a callback passed that expects a BackoffInitialisationException to be passed
-//        $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-//        $backoff = Backoff::noop()
-//            ->maxAttempts(2)
-//            ->retryExceptions()
-//            ->callUponException($callback1, $callback6); // <<<
-//
-//        $backoff->attempt(fn() => throw new BackoffException(), null);
-//
-//        self::assertSame(2, $count1);
-//        self::assertSame(0, $count6);
-//
-//
-//
-//        // a callback passed that expects more than 1 parameter
-//        $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-//        $backoff = Backoff::noop()
-//            ->maxAttempts(2)
-//            ->retryExceptions()
-//            ->callUponException($callback1, $callback8); // <<<
-//
-//        $caughtException = false;
-//        try {
-//            $backoff->attempt(fn() => throw new BackoffException(), null);
-//        } catch (Throwable) {
-//            $caughtException = true;
-//        }
-//        self::assertTrue($caughtException);
-//
-//
-//
-//        // a callback passed that expects a non-exception parameter
-//        $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-//        $backoff = Backoff::noop()
-//            ->maxAttempts(2)
-//            ->retryExceptions()
-//            ->callUponException($callback1, $callback7); // <<<
-//
-//        $caughtException = false;
-//        try {
-//            $backoff->attempt(fn() => throw new BackoffException(), null);
-//        } catch (Throwable) {
-//            $caughtException = true;
-//        }
-//        self::assertTrue($caughtException);
-//
-//
-//
-//        // a callback passed that expects a non-exception parameter
-//        $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-//        $backoff = Backoff::noop()
-//            ->maxAttempts(2)
-//            ->retryExceptions()
-//            ->callUponException($callback1, $callback8); // <<<
-//
-//        $caughtException = false;
-//        try {
-//            $backoff->attempt(fn() => throw new BackoffException(), null);
-//        } catch (Throwable) {
-//            $caughtException = true;
-//        }
-//        self::assertTrue($caughtException);
-//
-//
-//
-//        // a callback passed that expects a non-exception parameter
-//        $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-//        $backoff = Backoff::noop()
-//            ->maxAttempts(2)
-//            ->retryExceptions()
-//            ->callUponException($callback1, $callback9); // <<<
-//
-//        $caughtException = false;
-//        try {
-//            $backoff->attempt(fn() => throw new BackoffException(), null);
-//        } catch (Throwable) {
-//            $caughtException = true;
-//        }
-//        self::assertTrue($caughtException);
-//
-//
-//
-//        // a callback passed that expects a non-exception parameter
-//        $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-//        $backoff = Backoff::noop()
-//            ->maxAttempts(2)
-//            ->retryExceptions()
-//            ->callUponException($callback1, $callback10); // <<<
-//
-//        $caughtException = false;
-//        try {
-//            $backoff->attempt(fn() => throw new BackoffException(), null);
-//        } catch (Throwable) {
-//            $caughtException = true;
-//        }
-//        self::assertTrue($caughtException);
-//
-//
-//
-//        // a callback passed that expects a non-exception parameter
-//        $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-//        $backoff = Backoff::noop()
-//            ->maxAttempts(2)
-//            ->retryExceptions()
-//            ->callUponException($callback1, $invokableClass); // <<<
-//
-//        $backoff->attempt(fn() => throw new BackoffException(), null);
-//
-//
-//
-//        // a callback passed that expects a non-exception parameter
-//        $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-//        $backoff = Backoff::noop()
-//            ->maxAttempts(2)
-//            ->retryExceptions()
-//            ->callUponException($callback1, $callable); // <<<
-//
-//        $backoff->attempt(fn() => throw new BackoffException(), null);
-//
-//
-//
-//        // a callback passed with an intersection type hint including Exceptions
-//        $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-//        $backoff = Backoff::noop()
-//            ->maxAttempts(2)
-//            ->retryExceptions()
-//            ->callUponException($callback1, $callback11); // <<<
-//
-//        $caughtException = false;
-//        try {
-//            $backoff->attempt(fn() => throw new BackoffException(), null);
-//        } catch (Throwable) {
-//            $caughtException = true;
-//        }
-//        self::assertTrue($caughtException);
-//
-//
-//
-//        if (version_compare(PHP_VERSION, '8.1.0', '>=')) {
-//
-//            // a callback passed with an intersection type hint including Exceptions
-//            $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-//            $backoff = Backoff::noop()
-//                ->maxAttempts(2)
-//                ->retryExceptions()
-//                ->callUponException($callback1, $callback12); // <<<
-//
-//            $backoff->attempt(fn() => throw new BackoffException(), null);
-//
-//            self::assertSame(2, $count1);
-//            self::assertSame(2, $count12);
-//        }
-//
-//
-//
-//        if (version_compare(PHP_VERSION, '8.1.0', '>=')) {
-//            // a callback passed with an intersection type hint excluding Exceptions
-//            $count1 = $count2 = $count3 = $count4 = $count5 = $count6 = $count12 = 0;
-//            $backoff = Backoff::noop()
-//                ->maxAttempts(2)
-//                ->retryExceptions()
-//                ->callUponException($callback1, $callback13); // <<<
-//
-//            $caughtException = false;
-//            try {
-//                $backoff->attempt(fn() => throw new BackoffException(), null);
-//            } catch (Throwable) {
-//                $caughtException = true;
-//            }
-//            self::assertTrue($caughtException);
-//        }
-//    }
-
-
-
-
-
     /**
      * Test the retryAllExceptions() method.
      *
+     * @test
+     *
      * @return void
      */
+    #[Test]
     public static function test_retry_all_exceptions(): void
     {
         $randInt = mt_rand();
@@ -1989,14 +1659,14 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public static function test_that_dont_retry_exceptions_disables_retries(): void
     {
         $newBackoff = fn() => Backoff::noop()->maxAttempts(5)->retryExceptions();
 
-        $createCallback = fn(&$count)
-            => function (Throwable $e, AttemptLog $log, bool $willRetry) use (&$count) {
-                $count++;
-            };
+        $createCallback = fn(&$count) => function (Throwable $e, AttemptLog $log, bool $willRetry) use (&$count) {
+            $count++;
+        };
 
         // noop - WILL retry exceptions - will call the callback more than once
         $count = 0;
@@ -2015,11 +1685,45 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
     }
 
     /**
-     * Test that all exceptions are checked for and a default is returned when retryExceptions is called with only
-     * default specified.
+     * Test that when exceptions are not retried, a default value can be used.
+     *
+     * @test
      *
      * @return void
      */
+    #[Test]
+    public static function test_that_dont_retry_exceptions_can_have_a_default(): void
+    {
+        $newBackoff = fn() => Backoff::noop()->maxAttempts(5)->retryExceptions();
+
+        // with no default passed
+        $caughtException = false;
+        try {
+            $newBackoff()
+                ->dontRetryExceptions() // <<< no default
+                ->attempt(fn() => throw new Exception());
+        } catch (Throwable $e) {
+            $caughtException = true;
+        }
+        self::assertTrue($caughtException);
+
+        // with default passed
+        $default = mt_rand();
+        $return = $newBackoff()
+            ->dontRetryExceptions($default) // <<< default
+            ->attempt(fn() => throw new Exception());
+        self::assertSame($default, $return);
+    }
+
+    /**
+     * Test that all exceptions are checked for and a default is returned when retryExceptions is called with only
+     * default specified.
+     *
+     * @test
+     *
+     * @return void
+     */
+    #[Test]
     public static function test_that_exceptions_are_retried_when_only_a_default_is_passed(): void
     {
         $randInt = mt_rand();
@@ -2044,6 +1748,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public static function test_that_every_exception_callback_is_called(): void
     {
         $maxAttempts = 5;
@@ -2051,7 +1756,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
 
         $exception = new Exception();
         $createCallback = fn(&$count)
-            => function (Throwable $e, AttemptLog $log, bool $willRetry) use (&$count, $exception) {
+            => function (Throwable $e, AttemptLog $log, bool $willRetry) use (&$count) {
                 $count++;
             };
 
@@ -2120,6 +1825,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public static function test_which_exception_is_passed_to_exception_callbacks(): void
     {
         $newBackoff = fn() => Backoff::noop()->maxAttempts(2)->retryExceptions();
@@ -2145,6 +1851,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public static function test_will_retry_is_passed_to_exception_callbacks_correctly(): void
     {
         $maxAttempts = mt_rand(0, 10);
@@ -2205,6 +1912,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public static function test_that_exception_callback_exceptions_are_rethrown(): void
     {
         $count = 0;
@@ -2240,6 +1948,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public static function test_that_invalid_value_callbacks_are_called(): void
     {
         $maxAttempts = 2;
@@ -2328,13 +2037,16 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
     /**
      * Test that exceptions thrown by callbacks passed to ->invalidResultCallback(), are thrown.
      *
+     * @test
+     *
      * @return void
      */
+    #[Test]
     public static function test_that_invalid_value_callback_exceptions_are_thrown(): void
     {
         $exception = new Exception();
         $count = 0;
-        $callback = function(mixed $result, AttemptLog $log) use(&$count, $exception): bool {
+        $callback = function (mixed $result, AttemptLog $log) use (&$count, $exception): bool {
             $count++;
             throw $exception;
         };
@@ -2364,6 +2076,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public static function test_that_retry_when_and_retry_until_reset_the_other(): void
     {
         $count = 0;
@@ -2404,6 +2117,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public static function test_that_every_success_callback_is_called()
     {
         $maxAttempts = 5;
@@ -2477,8 +2191,11 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
      * Test that the success callback is called only once when expected, even if exceptions or invalid values have
      * caused multiple retries.
      *
+     * @test
+     *
      * @return void
      */
+    #[Test]
     public static function test_that_success_callbacks_are_called_only_once_when_expected(): void
     {
         $createCallback = fn(&$count)
@@ -2517,8 +2234,11 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
     /**
      * Test that the array of AttemptLogs are passed to success callbacks.
      *
+     * @test
+     *
      * @return void
      */
+    #[Test]
     public static function test_that_attempt_logs_are_passed_to_success_callbacks(): void
     {
         // generate a callback that throws a callback until it's been called a certain number of times
@@ -2563,6 +2283,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public static function test_that_every_failure_callback_is_called()
     {
         $maxAttempts = 5;
@@ -2637,8 +2358,11 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
      * Test that the failure callback is called only once when expected, even if exceptions or invalid values have
      * caused multiple retries.
      *
+     * @test
+     *
      * @return void
      */
+    #[Test]
     public static function test_that_failure_callbacks_are_called_only_once_when_expected(): void
     {
         $createCallback = fn(&$count)
@@ -2691,8 +2415,11 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
     /**
      * Test that the array of AttemptLogs are passed to failure callbacks.
      *
+     * @test
+     *
      * @return void
      */
+    #[Test]
     public static function test_that_attempt_logs_are_passed_to_failure_callbacks(): void
     {
         foreach ([0, 1, 2, 3, 4] as $maxAttempts) {
@@ -2724,6 +2451,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public static function test_that_every_finally_callback_is_called()
     {
         $maxAttempts = 5;
@@ -2797,8 +2525,11 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
      * Test that the finally callback is called only once when expected, even if exceptions or invalid values have
      * caused multiple retries.
      *
+     * @test
+     *
      * @return void
      */
+    #[Test]
     public static function test_that_finally_callbacks_are_called_only_once_when_expected(): void
     {
         $createCallback = fn(&$count)
@@ -2850,8 +2581,11 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
     /**
      * Test that the array of AttemptLogs are passed to finally callbacks.
      *
+     * @test
+     *
      * @return void
      */
+    #[Test]
     public static function test_that_attempt_logs_are_passed_to_finally_callbacks(): void
     {
         foreach ([0, 1, 2, 3, 4] as $maxAttempts) {
@@ -2883,6 +2617,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public static function test_that_backoff_returns_itself_to_its_original_state_after_running_attempts(): void
     {
         $backoff = Backoff::noop()->maxAttempts(5)->runsAtStartOfLoop()->retryExceptions();
@@ -2925,8 +2660,11 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
     /**
      * Test that a Backoff instance can be reused.
      *
+     * @test
+     *
      * @return void
      */
+    #[Test]
     public static function test_that_backoff_instance_can_be_reused(): void
     {
         $count = 0;
@@ -2961,6 +2699,8 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
      * @param callable $callBackoffMethod A function that returns a BackoffStrategy instance.
      * @return void
      */
+    #[Test]
+    #[DataProvider('methodsThatRequireTheStrategyToHaveNotStartedYetDataProvider')]
     public static function test_the_methods_that_require_the_strategy_not_to_have_started_yet(
         callable $callBackoffMethod
     ): void {
@@ -3028,11 +2768,13 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
      * retryExceptions(), exceptionCallback(), retryWhen(), retryUntil(), invalidResultCallback().
      *
      * @test
-     * @dataProvider AttemptLogDataProvider
+     * @dataProvider attemptLogDataProvider
      *
      * @param callable $defineAndRunBackoff Build and run the Backoff, using $callback in the way that's being tested.
      * @return void
      */
+    #[Test]
+    #[DataProvider('attemptLogDataProvider')]
     public static function test_the_attempt_logs_that_are_passed_to_callbacks(callable $defineAndRunBackoff): void
     {
         $startedAt = new DateTime();
@@ -3061,7 +2803,6 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
             return function (
                 mixed $exceptionOrResult,
                 AttemptLog $l,
-//                bool $willRetry,
             ) use (
                 $startedAt,
                 &$attemptSequence,
@@ -3182,7 +2923,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
     /**
      * DataProvider for test_the_attempt_logs_that_are_passed_to_callbacks().
      *
-     * @return array[]
+     * @return array<string,array<string,callable>>
      */
     public static function attemptLogDataProvider(): array
     {

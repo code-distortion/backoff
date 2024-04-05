@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodeDistortion\Backoff\Tests\Unit;
 
 use CodeDistortion\Backoff\Backoff;
@@ -7,6 +9,7 @@ use CodeDistortion\Backoff\Tests\PHPUnitTestCase;
 use CodeDistortion\Backoff\Traits\BackoffDecoratorTrait;
 use CodeDistortion\Backoff\Traits\BackoffRunnerTrait;
 use CodeDistortion\Backoff\Traits\BackoffStrategyTrait;
+use PHPUnit\Framework\Attributes\Test;
 
 /**
  * Test that the backoff classes use the correct traits and implement the correct interfaces.
@@ -22,6 +25,7 @@ class BackoffClassesUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public static function test_that_classes_use_the_correct_traits(): void
     {
         $traits = class_uses(Backoff::class);
@@ -29,19 +33,4 @@ class BackoffClassesUnitTest extends PHPUnitTestCase
         self::assertArrayHasKey(BackoffRunnerTrait::class, $traits);
         self::assertArrayHasKey(BackoffStrategyTrait::class, $traits);
     }
-
-//    /**
-//     * Check to make sure the backoff classes implement the correct interfaces.
-//     *
-//     * @test
-//     *
-//     * @return void
-//     */
-//    public static function test_that_classes_implement_the_correct_interfaces(): void
-//    {
-//        $backoff = Backoff::noop();
-//        self::assertInstanceOf(SomeInterface::class, $backoff);
-//        // or ?
-//        self::assertInstanceOf(SomeInterface::class, Backoff::class);
-//    }
 }

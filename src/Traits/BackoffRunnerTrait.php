@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodeDistortion\Backoff\Traits;
 
 use CodeDistortion\Backoff\Support\PossibleMatch;
@@ -7,7 +9,18 @@ use CodeDistortion\Backoff\Support\Support;
 use Throwable;
 
 /**
- * Adds backoff-strategy runner functionality.
+ * Adds backoff-strategy runner functionality to a class.
+ * - tries the action,
+ * - retries when:
+ *   - exceptions occur, and/or
+ *   - certain exceptions occur, and/or
+ *   - a matching result is returned, and/or
+ *   - a matching result is not returned
+ * - uses the backoff-strategy to manage the retry sleeps, and when to abandon,
+ * - calls callbacks at certain stages,
+ * - returns the result, a default value, or re-throws the last exception.
+ *
+ * @see BackoffStrategyTrait
  */
 trait BackoffRunnerTrait
 {
@@ -20,6 +33,12 @@ trait BackoffRunnerTrait
 
     /** @var callable[] The callbacks to call when an exception occurs. */
     private array $exceptionCallbacks = [];
+
+    /** @var boolean Whether a default value has been provided when not catching exceptions. */
+    private bool $hasExceptionDefault = false;
+
+    /** @var mixed The default value to return when not catching exceptions, instead of rethrowing. */
+    private mixed $exceptionDefault = null;
 
 
 
@@ -64,12 +83,17 @@ trait BackoffRunnerTrait
      */
     public function retryExceptions(string|callable|array|false $exceptions = [], mixed $default = null): static
     {
+        $defaultWasSpecified = (func_num_args() >= 2);
+
         if ($exceptions === false) {
             $this->retryExceptions = false;
+            $this->hasExceptionDefault = $defaultWasSpecified;
+            $this->exceptionDefault = $default;
             return $this;
         }
 
-        $defaultWasSpecified = (func_num_args() >= 2);
+        $this->hasExceptionDefault = false;
+        $this->exceptionDefault = true;
 
         $exceptions = Support::normaliseParameters([$exceptions], true);
 
@@ -111,13 +135,17 @@ trait BackoffRunnerTrait
     /**
      * Specify that exceptions should not be retried.
      *
+     * @param mixed $default The default value to return if an exception occurs (when omitted, the exception is
+     *                       rethrown).
      * @return $this
      */
-    public function dontRetryExceptions(): static
+    public function dontRetryExceptions(mixed $default = null): static
     {
-        $this->retryExceptions = false;
+        $defaultWasSpecified = (func_num_args() >= 1);
 
-        return $this;
+        return $defaultWasSpecified
+            ? $this->retryExceptions(false, $default)
+            : $this->retryExceptions(false);
     }
 
     /**
@@ -131,6 +159,7 @@ trait BackoffRunnerTrait
      */
     public function exceptionCallback(callable|array $callback, callable|array ...$callbacks): static
     {
+        /** @var callable[] $callbacks */
         $callbacks = Support::normaliseParameters(array_merge([$callback], $callbacks), true);
         $this->exceptionCallbacks = array_merge($this->exceptionCallbacks, $callbacks);
 
@@ -189,6 +218,7 @@ trait BackoffRunnerTrait
      */
     public function invalidResultCallback(callable|array $callback, callable|array ...$callbacks): static
     {
+        /** @var callable[] $callbacks */
         $callbacks = Support::normaliseParameters(array_merge([$callback], $callbacks), true);
         $this->invalidResultCallbacks = array_merge($this->invalidResultCallbacks, $callbacks);
 
@@ -210,6 +240,7 @@ trait BackoffRunnerTrait
      */
     public function successCallback(callable|array $callback, callable|array ...$callbacks): static
     {
+        /** @var callable[] $callbacks */
         $callbacks = Support::normaliseParameters(array_merge([$callback], $callbacks), true);
         $this->successCallbacks = array_merge($this->successCallbacks, $callbacks);
 
@@ -227,6 +258,7 @@ trait BackoffRunnerTrait
      */
     public function failureCallback(callable|array $callback, callable|array ...$callbacks): static
     {
+        /** @var callable[] $callbacks */
         $callbacks = Support::normaliseParameters(array_merge([$callback], $callbacks), true);
         $this->failureCallbacks = array_merge($this->failureCallbacks, $callbacks);
 
@@ -261,6 +293,7 @@ trait BackoffRunnerTrait
      */
     public function finallyCallback(callable|array $callback, callable|array ...$callbacks): static
     {
+        /** @var callable[] $callbacks */
         $callbacks = Support::normaliseParameters(array_merge([$callback], $callbacks), true);
         $this->finallyCallbacks = array_merge($this->finallyCallbacks, $callbacks);
 
@@ -378,6 +411,8 @@ trait BackoffRunnerTrait
                     $overrideDefaultWith = $exceptionMatch->getDefault();
                 } else {
                     $stop = true;
+                    $overrideDefault = $this->hasExceptionDefault;
+                    $overrideDefaultWith = $this->exceptionDefault;
                 }
 
                 // or check if it's the last attempt
@@ -576,184 +611,4 @@ trait BackoffRunnerTrait
             ? $default()
             : $default;
     }
-
-
-
-
-
-
-
-//    /**
-//     * Call a callback provided it accepts a Throwable of the same type as the exception passed.
-//     *
-//     * @param callable  $callable  The callback to call.
-//     * @param Throwable $exception The exception to pass to the callback.
-//     * @return mixed
-//     * @throws BackoffRuntimeException When the callback's expects more than 1 parameter.
-//     * @throws BackoffRuntimeException When the callback's parameter can't be resolved.
-//     */
-//    private function callExceptionCallback(callable $callable, Throwable $exception): mixed
-//    {
-//        return $callable($exception, $this->currentLog());
-//
-//
-//
-//        // todo - remove below
-//
-//        // make sure the callable accepts 0 or 1 parameter
-//        $parameters = $this->generateCallbackParameters($callable, $exception);
-//        if (count($parameters) > 1) {
-//            throw BackoffRuntimeException::exceptionCallbackAcceptsMoreThan1Param(array_keys($parameters));
-//        }
-//
-//        // make sure the exception was matched to a parameter before calling it, otherwise, skip it
-//        if (in_array(null, $parameters, true)) {
-//            return null;
-//        }
-//
-//        // todo - add $this->currentLog() to the parameters
-//        // todo - allow for this to call a callback when the parameter doesn't specify a type
-//        return $callable(...$parameters);
-//    }
-//
-//    /**
-//     * Generate the parameters to pass to a callback.
-//     *
-//     * @param callable  $callable  The callback that will be called.
-//     * @param Throwable $exception The exception that needs to be passed to the callback.
-//     * @return mixed[]
-//     * @throws BackoffRuntimeException When the callback's parameters can't be resolved.
-//     */
-//    private function generateCallbackParameters(callable $callable, Throwable $exception): array
-//    {
-//        $return = [];
-//        $reflection = $this->getCallableReflection($callable);
-//        foreach ($reflection->getParameters() as $parameter) {
-//            $parameterName = $parameter->getName();
-//            $return[$parameterName] = $this->exceptionIfParameterMatches($parameter, $exception);
-//        }
-//
-//        return $return;
-//    }
-
-//    /**
-//     * Get the reflection method/function for a callable.
-//     *
-//     * @param callable $callable The callable to get the reflection method for.
-//     * @return ReflectionMethod|ReflectionFunction
-//     * @throws ReflectionException When the callable can't be used.
-//     */
-//    private function getCallableReflection(callable $callable): ReflectionMethod|ReflectionFunction
-//    {
-//        // determine if the callable is a function or a method
-//
-//        // callable is an array, could be a static or instance method
-//        if (is_array($callable)) {
-//
-//            [$objectOrClass, $method] = $callable;
-//            return new ReflectionMethod($objectOrClass, $method);
-//        }
-//
-//        // callable is a Closure or a function name
-//        if ($callable instanceof Closure || is_string($callable)) {
-//            return new ReflectionFunction($callable);
-//        }
-//
-//        // callable is an invokable object
-//        return new ReflectionMethod($callable, '__invoke');
-//    }
-
-//    /**
-//     * Check a parameter to see if it matches the exception.
-//     *
-//     * @param ReflectionParameter $parameter The parameter to check.
-//     * @param Throwable           $exception The exception to check against.
-//     * @return Throwable|null
-//     * @throws BackoffRuntimeException When the parameter cannot be used.
-//     */
-//    private function exceptionIfParameterMatches(ReflectionParameter $parameter, Throwable $exception): ?Throwable
-//    {
-//        $parameterName = $parameter->getName();
-//        $parameterType = $parameter->getType();
-//
-//        // a parameter might have one type,
-//        // or several in the case of union and intersection types,
-//        // (or none when not specified)
-//        // collect them all into an array so they can all be checked (only one needs to match)
-//        $types = [];
-//        $typeHintJoinType = null;
-//        if ($parameterType instanceof ReflectionNamedType) {
-//            $types[] = $parameterType;
-//        } elseif ($parameterType instanceof ReflectionUnionType) {
-//            $typeHintJoinType = '|';
-//            $types = $parameterType->getTypes();
-//        } elseif ($parameterType instanceof ReflectionIntersectionType) {
-//            $typeHintJoinType = '&';
-//            $types = $parameterType->getTypes();
-//        } else {
-//            throw BackoffRuntimeException::invalidExceptionCallbackParameter($parameterName);
-//        }
-//
-//        $foundExceptionType = false;
-//        $typeHintParts = [];
-//        /** @var ReflectionNamedType $type */
-//        foreach ($types as $type) {
-//
-//            $typeHintParts[] = $type->getName();
-//
-//            // ignore built-in types - int, float, etc
-//            if ($type->isBuiltin()) {
-//                continue;
-//            }
-//
-//            $className = $type->getName();
-//            if (!$this->paramIsAnExceptionOfSomeSort($className)) {
-//                continue;
-//            }
-//            $foundExceptionType = true;
-//
-//            if ($this->isA($className, $exception)) {
-//                return $exception;
-//            }
-//        }
-//
-//        $typeHint = $typeHintJoinType
-//            ? implode($typeHintJoinType, $typeHintParts)
-//            : $typeHintParts[0] ?? null;
-//
-//        return $foundExceptionType
-//            ? null
-//            : throw BackoffRuntimeException::invalidExceptionCallbackParameter($parameterName, $typeHint);
-//    }
-
-//    /**
-//     * Check if a class is a Throwable or a subclass of Throwable.
-//     *
-//     * @param string $class The class to check.
-//     * @return boolean
-//     */
-//    private function paramIsAnExceptionOfSomeSort(string $class): bool
-//    {
-//        return (($class === 'Throwable') || (is_subclass_of($class, 'Throwable')));
-//    }
-
-//    /**
-//     * Check if a class is a particular type of exception.
-//     *
-//     * @param string    $class     The class to check.
-//     * @param Throwable $exception The exception to check against.
-//     * @return boolean
-//     */
-//    private function isA(string $class, Throwable $exception): bool
-//    {
-//        if ($class == get_class($exception)) {
-//            return true;
-//        }
-//
-//        if (is_subclass_of($exception, $class)) {
-//            return true;
-//        }
-//
-//        return false;
-//    }
 }

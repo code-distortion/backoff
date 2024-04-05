@@ -286,7 +286,7 @@ Last, use it to run your work…
 ->attempt($action, $default); // run your callback, retry it when needed, and return $default if all attempts fail
 ```
 
-You don't need to use these methods,  but if they'll help you if you'd like to [manage the retry loop yourself](#or-manage-the-retry-loop-yourself)…
+You don't need to use these methods, but if they'll help you if you'd like to [manage the retry loop yourself](#or-manage-the-retry-loop-yourself)…
 
 ```php
 // tell backoff where you're placing the call to ->step() (default = afterwards)
@@ -1007,7 +1007,7 @@ Backoff::exponential(1)
 
 ### Don't Retry When Exceptions Occur
 
-And finally, you can turn this off so retries are *not* made when exceptions occur (they will be rethrown).
+And finally, you can turn this off so retries are *not* made when exceptions occur.
 
 ```php
 Backoff::exponential(1)
@@ -1016,6 +1016,14 @@ Backoff::exponential(1)
 // or
 Backoff::exponential(1)
     ->dontRetryExceptions() // <<<
+    ->attempt($action);
+```
+
+Normally, the exception will be rethrown. But you can pass a `$default` value to return instead.
+
+```php
+Backoff::exponential(1)
+    ->dontRetryExceptions($default) // <<<
     ->attempt($action);
 ```
 
@@ -1033,7 +1041,7 @@ By default, Backoff will *not* retry based on the value returned by your `$actio
 
 You can specify for retries to occur when particular values are returned, along with an optional `$default` value to return if all attempts fail.
 
-`$strict` allows you to compare the returned value to `$value` using strict comparison (`===`).
+`$strict` allows you to compare the returned value to `$match` using strict comparison (`===`).
 
 When you don't specify a default, the final value returned by `$action` will be returned.
 
@@ -1061,7 +1069,7 @@ Backoff::exponential(1)
 
 ### Retry Until…
 
-Conversely to `->retryWhen()`, you can specify value/s to wait for, retrying *until* they're returned.
+Conversely to `->retryWhen()`, you can specify `$match` value/s to wait for, retrying *until* they're returned.
 
 ```php
 Backoff::exponential(1)

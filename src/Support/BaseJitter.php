@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodeDistortion\Backoff\Support;
 
 use CodeDistortion\Backoff\Interfaces\JitterInterface;
@@ -31,6 +33,6 @@ abstract class BaseJitter implements JitterInterface
         return Support::randFloat(
             $this->min * $delay,
             $this->max * $delay,
-        );
+        ) ?? 0;
     }
 }

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodeDistortion\Backoff\Algorithms;
 
 use CodeDistortion\Backoff\Interfaces\BackoffAlgorithmInterface;

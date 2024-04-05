@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodeDistortion\Backoff\Tests\Unit;
 
 use CodeDistortion\Backoff\AttemptLog;
@@ -8,6 +10,8 @@ use CodeDistortion\Backoff\Settings;
 use CodeDistortion\Backoff\Support\Support;
 use CodeDistortion\Backoff\Tests\PHPUnitTestCase;
 use DateTime;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Test;
 
 /**
  * Test the AttemptLog class.
@@ -35,6 +39,8 @@ class AttemptLogUnitTest extends PHPUnitTestCase
      * @param string             $unitType               The unit type that delay and overall delay are in.
      * @return void
      */
+    #[Test]
+    #[DataProvider('attemptLogDataProvider')]
     public static function test_backoff_attempt_dto(
         int $attemptNumber,
         ?int $maxAttempts,
@@ -185,7 +191,7 @@ class AttemptLogUnitTest extends PHPUnitTestCase
     /**
      * DataProvider for test_backoff_attempt_dto.
      *
-     * @return array
+     * @return array<array<string,integer|float|null|DateTime|string>>
      */
     public static function attemptLogDataProvider(): array
     {
@@ -250,9 +256,12 @@ class AttemptLogUnitTest extends PHPUnitTestCase
     /**
      * Test that the AttemptLog constructor throws an exception when given invalid data.
      *
+     * @test
+     *
      * @return void
      * @throws BackoffInitialisationException This will always be thrown.
      */
+    #[Test]
     public function test_that_constructor_throws_exception(): void
     {
         $this->expectException(BackoffInitialisationException::class);

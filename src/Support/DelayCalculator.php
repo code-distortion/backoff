@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodeDistortion\Backoff\Support;
 
 use CodeDistortion\Backoff\Exceptions\BackoffInitialisationException;
@@ -8,7 +10,7 @@ use CodeDistortion\Backoff\Interfaces\JitterInterface;
 use CodeDistortion\Backoff\Settings;
 
 /**
- * Used to calculate delays. Will cache the delays so that the same attempt number will always return the same delay.
+ * Used to calculate delays. Will cache the delays so that the same retry number will always return the same delay.
  */
 class DelayCalculator
 {
@@ -23,7 +25,7 @@ class DelayCalculator
     /**
      * @param BackoffAlgorithmInterface $backoffAlgorithm    The backoff algorithm to use.
      * @param JitterInterface|null      $jitter              The jitter to apply.
-     * @param integer|null              $maxAttempts         The maximum number of attempts to allow - null for infinite
+     * @param integer|null              $maxRetries          The maximum number of retries to allow - null for infinite
      *                                                       (default: null).
      * @param integer|float|null        $maxDelay            The maximum delay to allow.
      * @param string                    $unitType            The unit type to use.
@@ -35,7 +37,7 @@ class DelayCalculator
     public function __construct(
         private BackoffAlgorithmInterface $backoffAlgorithm,
         private ?JitterInterface $jitter,
-        protected ?int $maxAttempts,
+        protected ?int $maxRetries,
         protected int|float|null $maxDelay,
         private string $unitType,
         private bool $immediateFirstRetry,
@@ -63,65 +65,62 @@ class DelayCalculator
 
 
     /**
-     * Get the base delay for a given attempt number.
+     * Get the base delay for a given retry number.
      *
-     * This will cache the result to return consistent results for the same attempt number.
+     * This will cache the result, so requests for the same retry return consistent results.
      *
-     * @param integer $attemptNumber The attempt that this is a delay for. This calculates the delay that's applied
-     *                               before this attempt.
+     * @param integer $retryNumber The retry the delay is for.
      * @return integer|float|null
      */
-    public function getBaseDelay(int $attemptNumber): int|float|null
+    public function getBaseDelay(int $retryNumber): int|float|null
     {
-        if (array_key_exists($attemptNumber, $this->baseDelays)) {
-            return $this->baseDelays[$attemptNumber];
+        if (array_key_exists($retryNumber, $this->baseDelays)) {
+            return $this->baseDelays[$retryNumber];
         }
 
-        $baseDelay = $this->calculateBaseDelay($attemptNumber);
+        $baseDelay = $this->calculateBaseDelay($retryNumber);
         $baseDelay = $this->enforceBounds($baseDelay);
 
-        $this->baseDelays[$attemptNumber] = $baseDelay;
+        $this->baseDelays[$retryNumber] = $baseDelay;
 
         return $baseDelay;
     }
 
     /**
-     * Get the base delay with jitter applied to it for a given attempt number.
+     * Get the delay after jitter is applied to it, for a given retry number.
      *
-     *  This will cache the result to return consistent results for the same attempt number.
+     * This will cache the result, so requests for the same retry return consistent results.
      *
-     * @param integer $attemptNumber The attempt that this is a delay for. This calculates the delay that's applied
-     *                               before this attempt.
+     * @param integer $retryNumber The retry the delay is for.
      * @return integer|float|null
      */
-    public function getJitteredDelay(int $attemptNumber): int|float|null
+    public function getJitteredDelay(int $retryNumber): int|float|null
     {
-        if (array_key_exists($attemptNumber, $this->jitteredDelays)) {
-            return $this->jitteredDelays[$attemptNumber];
+        if (array_key_exists($retryNumber, $this->jitteredDelays)) {
+            return $this->jitteredDelays[$retryNumber];
         }
 
-        $baseDelay = $this->getBaseDelay($attemptNumber);
-        $jitteredDelay = $this->applyJitter($baseDelay, $attemptNumber);
+        $baseDelay = $this->getBaseDelay($retryNumber);
+        $jitteredDelay = $this->applyJitter($baseDelay, $retryNumber);
         $jitteredDelay = $this->enforceMinBound($jitteredDelay);
 
-        $this->jitteredDelays[$attemptNumber] = $jitteredDelay;
+        $this->jitteredDelays[$retryNumber] = $jitteredDelay;
 
         return $jitteredDelay;
     }
 
     /**
-     * Check if a delay exists for a given attempt number.
+     * Check if a delay will be calculated for a given retry number.
      *
-     * @param integer $attemptNumber The attempt that this is a delay for. This calculates the delay that's applied
-     *                               before this attempt.
+     * @param integer $retryNumber The retry to check.
      * @return boolean
      */
-    public function shouldStop(int $attemptNumber): bool
+    public function shouldStop(int $retryNumber): bool
     {
-        if ($attemptNumber <= 1) {
+        if ($retryNumber <= 0) {
             return false;
         }
-        return is_null($this->getBaseDelay($attemptNumber));
+        return is_null($this->getBaseDelay($retryNumber));
     }
 
 
@@ -129,17 +128,16 @@ class DelayCalculator
 
 
     /**
-     * Get the base delay for a given attempt number.
+     * Get the base delay for a given retry number.
      *
-     * @param integer $attemptNumber The attempt that this is a delay for. This calculates the delay that's applied
-     *                               before this attempt.
+     * @param integer $retryNumber The retry the delay is for.
      * @return integer|float|null
      */
-    private function calculateBaseDelay(int $attemptNumber): int|float|null
+    private function calculateBaseDelay(int $retryNumber): int|float|null
     {
         // still calculate the delay,
         // this allows us to detect when the Algorithm returns null (to stop)
-        $baseDelay = $this->actuallyCalculateBaseDelay($attemptNumber);
+        $baseDelay = $this->actuallyCalculateBaseDelay($retryNumber);
 
         // return null if the Algorithm said to stop (by returning null)
         if (is_null($baseDelay)) {
@@ -152,33 +150,29 @@ class DelayCalculator
     }
 
     /**
-     * Get the base delay for a given attempt number.
+     * Get the base delay for a given retry number.
      *
-     * @param integer $attemptNumber The attempt that this is a delay for. This calculates the delay that's applied
-     *                               before this attempt.
+     * @param integer $retryNumber The retry the delay is for.
      * @return integer|float|null
      */
-    private function actuallyCalculateBaseDelay(int $attemptNumber): int|float|null
+    private function actuallyCalculateBaseDelay(int $retryNumber): int|float|null
     {
-        if ($attemptNumber <= 1) {
+        if ($retryNumber <= 0) {
             return null;
         }
 
-        if ((!is_null($this->maxAttempts)) && ($attemptNumber > $this->maxAttempts)) {
+        if ((!is_null($this->maxRetries)) && ($retryNumber > $this->maxRetries)) {
             return null;
         }
 
-        $prevBaseDelay = $this->getBaseDelay($attemptNumber - 1);
+        $prevBaseDelay = $this->getBaseDelay($retryNumber - 1);
 
         if ($this->immediateFirstRetry) {
-            if ($attemptNumber == 2) {
+            if ($retryNumber == 1) {
                 return 0;
             }
-            $attemptNumber--;
+            $retryNumber--;
         }
-
-        // just to be explicit that we're passing the "retry" number instead of the "attempt" number
-        $retryNumber = $attemptNumber - 1;
 
         return $this->backoffAlgorithm->calculateBaseDelay($retryNumber, $prevBaseDelay);
     }
@@ -186,12 +180,11 @@ class DelayCalculator
     /**
      * Apply jitter to a delay, if desired.
      *
-     * @param integer|float|null $delay         The delay to apply jitter to.
-     * @param integer            $attemptNumber The attempt that this is a delay for. This calculates the delay that's
-     *                                          applied before this attempt.
+     * @param integer|float|null $delay       The delay to apply jitter to.
+     * @param integer            $retryNumber The retry the delay is for.
      * @return integer|float|null
      */
-    private function applyJitter(int|float|null $delay, int $attemptNumber): int|float|null
+    private function applyJitter(int|float|null $delay, int $retryNumber): int|float|null
     {
         if (!$this->backoffAlgorithm->jitterMayBeApplied()) {
             return $delay;
@@ -208,9 +201,6 @@ class DelayCalculator
         if ($delay <= 0) {
             return $delay;
         }
-
-        // just to be explicit that we're passing the "retry" number instead of the "attempt" number
-        $retryNumber = $attemptNumber - 1;
 
         return $this->jitter->apply($delay, $retryNumber);
     }

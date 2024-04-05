@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodeDistortion\Backoff\Support;
 
 use CodeDistortion\Backoff\Settings;
@@ -59,29 +61,26 @@ abstract class Support
             return $delay;
         }
 
-        switch ($desiredUnitType) {
+        return match ($desiredUnitType) {
 
-            case Settings::UNIT_MICROSECONDS:
-                return match ($currentUnitType) {
-                    Settings::UNIT_MICROSECONDS => $delay,
-                    Settings::UNIT_MILLISECONDS => $delay * 1_000,
-                    default => $delay * 1_000_000,
-                };
+            Settings::UNIT_MICROSECONDS => match ($currentUnitType) {
+                Settings::UNIT_MICROSECONDS => $delay,
+                Settings::UNIT_MILLISECONDS => $delay * 1_000,
+                default => $delay * 1_000_000,
+            },
 
-            case Settings::UNIT_MILLISECONDS:
-                return match ($currentUnitType) {
-                    Settings::UNIT_MICROSECONDS => $delay / 1_000,
-                    Settings::UNIT_MILLISECONDS => $delay,
-                    default => $delay * 1_000,
-                };
+            Settings::UNIT_MILLISECONDS => match ($currentUnitType) {
+                Settings::UNIT_MICROSECONDS => $delay / 1_000,
+                Settings::UNIT_MILLISECONDS => $delay,
+                default => $delay * 1_000,
+            },
 
-            default: // Settings::UNIT_SECONDS
-                return match ($currentUnitType) {
-                    Settings::UNIT_MICROSECONDS => $delay / 1_000_000,
-                    Settings::UNIT_MILLISECONDS => $delay / 1_000,
-                    default => $delay,
-                };
-        }
+            default => match ($currentUnitType) { // seconds
+                Settings::UNIT_MICROSECONDS => $delay / 1_000_000,
+                Settings::UNIT_MILLISECONDS => $delay / 1_000,
+                default => $delay,
+            },
+        };
     }
 
 

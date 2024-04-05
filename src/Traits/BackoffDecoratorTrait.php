@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodeDistortion\Backoff\Traits;
 
 use CodeDistortion\Backoff\Algorithms\CallbackBackoffAlgorithm;
@@ -24,7 +26,9 @@ use CodeDistortion\Backoff\Jitter\RangeJitter;
 use CodeDistortion\Backoff\Settings;
 
 /**
- * Adds methods to assist with instantiation and configuration of a backoff-strategy.
+ * Decorates with methods to assist with instantiation and configuration of a backoff-strategy.
+ *
+ * @see BackoffStrategyTrait
  */
 trait BackoffDecoratorTrait
 {

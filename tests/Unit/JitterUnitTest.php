@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodeDistortion\Backoff\Tests\Unit;
 
 use CodeDistortion\Backoff\Exceptions\BackoffInitialisationException;
@@ -9,6 +11,7 @@ use CodeDistortion\Backoff\Jitter\EqualJitter;
 use CodeDistortion\Backoff\Jitter\FullJitter;
 use CodeDistortion\Backoff\Jitter\RangeJitter;
 use CodeDistortion\Backoff\Tests\PHPUnitTestCase;
+use PHPUnit\Framework\Attributes\Test;
 
 /**
  * Test the Jitter classes.
@@ -24,6 +27,7 @@ class JitterUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public static function test_range_jitter(): void
     {
         $min = mt_rand(0, 100000);
@@ -44,6 +48,7 @@ class JitterUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public static function test_callback_jitter(): void
     {
         // test that delay is passed
@@ -85,6 +90,7 @@ class JitterUnitTest extends PHPUnitTestCase
      *
      * @return void
      */
+    #[Test]
     public static function test_the_range_of_responses_the_different_jitter_classes_generate(): void
     {
         // lower bound is 0
@@ -150,6 +156,7 @@ class JitterUnitTest extends PHPUnitTestCase
      * @return void
      * @throws BackoffInitialisationException This will always be thrown.
      */
+    #[Test]
     public function test_that_range_jitter_throws_exception_when_max_is_less_than_min(): void
     {
         $this->expectException(BackoffInitialisationException::class);
@@ -165,6 +172,7 @@ class JitterUnitTest extends PHPUnitTestCase
      * @return void
      * @throws BackoffInitialisationException This will always be thrown.
      */
+    #[Test]
     public function test_that_range_jitter_throws_exception_when_max_is_less_than_min2(): void
     {
         $this->expectException(BackoffInitialisationException::class);

@@ -43,7 +43,7 @@ class BackoffAlgorithmUnitTest extends PHPUnitTestCase
      */
     #[Test]
     #[DataProvider('backoffAlgorithmDataProvider')]
-    public static function test_backoff_algorithm_output(callable $createAlgorithm, array $expected): void
+    public static function test_backoff_algorithm_generated_sequences(callable $createAlgorithm, array $expected): void
     {
         /** @var BaseBackoffAlgorithm $algorithmInstance */
         $algorithmInstance = $createAlgorithm();
@@ -60,7 +60,12 @@ class BackoffAlgorithmUnitTest extends PHPUnitTestCase
         $integerCallback = fn(int $retryCount) => $retryCount * 10;
         $floatCallback = fn(int $retryCount) => $retryCount * 1.5;
         $nullCallback = fn(int $retryCount) => null;
-        $prevDelayCallback = fn(int $retryCount, int|float|null $prevBaseDelay) => $prevBaseDelay + 2;
+        $prevDelayCallback = fn(int $retryCount, int|float|null $prevBaseDelay) => is_numeric($prevBaseDelay)
+            ? $prevBaseDelay + 2
+            : 2;
+
+        /** @var array<integer|float> $delaysWithNull */
+        $delaysWithNull = [1, 2, null, 4, 5]; // pretend this is typed as array<integer|float> for static analysis
 
         // Note: that bounding (between 0 and max-delay), max-attempts, jitter and rounding
         // to the nearest int for milliseconds and microseconds aren't tested here
@@ -251,7 +256,7 @@ class BackoffAlgorithmUnitTest extends PHPUnitTestCase
             // initial delay only (1 parameter)
             [
                 fn() => new FibonacciBackoffAlgorithm(-1), // negative initial delay
-                [-1, -2, -3, -5, -8, -13, -21, -34, -55],
+                [-1, -1, -2, -3, -5, -8, -13, -21, -34],
             ],
             [
                 fn() => new FibonacciBackoffAlgorithm(0), // zero initial delay
@@ -259,19 +264,19 @@ class BackoffAlgorithmUnitTest extends PHPUnitTestCase
             ],
             [
                 fn() => new FibonacciBackoffAlgorithm(1),
-                [1, 2, 3, 5, 8, 13, 21, 34, 55],
+                [1, 1, 2, 3, 5, 8, 13, 21, 34],
             ],
             [
                 fn() => new FibonacciBackoffAlgorithm(2),
-                [2, 4, 6, 10, 16, 26, 42, 68, 110],
+                [2, 2, 4, 6, 10, 16, 26, 42, 68],
             ],
             [
                 fn() => new FibonacciBackoffAlgorithm(1234), // large initial delay
-                [1234, 2468, 3702, 6170, 9872, 16042, 25914, 41956, 67870],
+                [1234, 1234, 2468, 3702, 6170, 9872, 16042, 25914, 41956],
             ],
             [
                 fn() => new FibonacciBackoffAlgorithm(1.5), // float initial delay
-                [1.5, 3.0, 4.5, 7.5, 12.0, 19.5, 31.5, 51.0, 82.5],
+                [1.5, 1.5, 3.0, 4.5, 7.5, 12.0, 19.5, 31.5, 51.0],
             ],
             // initial delay + include or exclude the first in the fibonacci sequence (2 parameters)
             [
@@ -283,6 +288,10 @@ class BackoffAlgorithmUnitTest extends PHPUnitTestCase
                 [1, 1, 2, 3, 5, 8, 13, 21, 34, 55],
             ],
             [
+                fn() => new FibonacciBackoffAlgorithm(1.5, false), // include the first
+                [1.5, 3.0, 4.5, 7.5, 12.0, 19.5, 31.5, 51.0, 82.5, 133.5],
+            ],
+            [
                 fn() => new FibonacciBackoffAlgorithm(1.5, true), // include the first
                 [1.5, 1.5, 3.0, 4.5, 7.5, 12.0, 19.5, 31.5, 51.0, 82.5],
             ],
@@ -290,9 +299,14 @@ class BackoffAlgorithmUnitTest extends PHPUnitTestCase
 
 
             // SequenceBackoffAlgorithm
+            // sequence only (1 parameter)
             [
                 fn() => new SequenceBackoffAlgorithm([]), // empty sequence
                 [null, null, null, null, null, null, null, null, null, null],
+            ],
+            [
+                fn() => new SequenceBackoffAlgorithm($delaysWithNull),
+                [1, 2, null, null, null, null, null, null, null, null],
             ],
             [
                 fn() => new SequenceBackoffAlgorithm([1, 2, 3, 4, 5]),
@@ -307,6 +321,16 @@ class BackoffAlgorithmUnitTest extends PHPUnitTestCase
                     [1, 10, 2, 9, 3, 8, 4, 7, 5, 6, 6, 5, 7, 4, 8, 3, 9, 2, 10, 1] // more than 10 values
                 ),
                 [1, 10, 2, 9, 3, 8, 4, 7, 5, 6],
+            ],
+            // sequence + repeat = false (2 parameters)
+            [
+                fn() => new SequenceBackoffAlgorithm([1, 2, 3, 4, 5], false),
+                [1, 2, 3, 4, 5, null, null, null, null, null],
+            ],
+            // sequence + repeat = true (2 parameters)
+            [
+                fn() => new SequenceBackoffAlgorithm([1, 2, 3, 4, 5], true),
+                [1, 2, 3, 4, 5, 5, 5, 5, 5, 5],
             ],
 
 
@@ -372,7 +396,9 @@ class BackoffAlgorithmUnitTest extends PHPUnitTestCase
             self::assertGreaterThanOrEqual($baseDelay, $delay);
             self::assertLessThanOrEqual($prevDelay * $multiplier, $delay);
 
-            $prevDelay = $delay;
+            $prevDelay = is_numeric($delay)
+                ? $delay
+                : 0;
         }
     }
 
@@ -425,6 +451,7 @@ class BackoffAlgorithmUnitTest extends PHPUnitTestCase
         $max = mt_rand($min, $min + 10);
         $algorithm = new RandomBackoffAlgorithm($min, $max);
 
+        // check the delays are within the min and max
         $delay = null;
         for ($retryNumber = 1; $retryNumber < 100; $retryNumber++) {
             $delay = $algorithm->calculateBaseDelay($retryNumber, $delay);
@@ -432,7 +459,7 @@ class BackoffAlgorithmUnitTest extends PHPUnitTestCase
             self::assertLessThanOrEqual($max, $delay);
         }
 
-        // different min and max
+        // mins and maxes that are <= 0, should always return 0's
         $algorithm = new RandomBackoffAlgorithm(-1, -1);
         self::assertSame(
             [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],

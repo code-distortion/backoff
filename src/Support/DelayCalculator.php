@@ -43,7 +43,7 @@ class DelayCalculator
         private bool $immediateFirstRetry,
         private bool $delaysEnabled,
     ) {
-        if (!in_array($this->unitType, Settings::ALL_UNIT_TYPES)) {
+        if (!in_array($this->unitType, Settings::ALL_UNIT_TYPES, true)) {
             throw BackoffInitialisationException::invalidUnitType($this->unitType);
         }
     }
@@ -190,7 +190,7 @@ class DelayCalculator
             return $delay;
         }
 
-        if (!$this->jitter) {
+        if (is_null($this->jitter)) {
             return $delay;
         }
 

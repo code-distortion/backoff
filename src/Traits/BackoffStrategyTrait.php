@@ -12,7 +12,7 @@ use CodeDistortion\Backoff\Interfaces\JitterInterface;
 use CodeDistortion\Backoff\Settings;
 use CodeDistortion\Backoff\Support\DelayCalculator;
 use CodeDistortion\Backoff\Support\Support;
-use CodeDistortion\Backoff\Support\TestDelayTracker;
+use CodeDistortion\Backoff\Support\DelayTracker;
 use DateTime;
 
 /**
@@ -70,8 +70,8 @@ trait BackoffStrategyTrait
 
     // working variables used for testing
 
-    /** @var TestDelayTracker|null Tracks delays, when running tests. */
-    private ?TestDelayTracker $testDelayTracker;
+    /** @var DelayTracker|null Tracks delays, when running tests. */
+    private ?DelayTracker $delayTracker;
 
 
 
@@ -105,7 +105,7 @@ trait BackoffStrategyTrait
     ) {
 
         $this->unitType = $unitType ?? Settings::UNIT_SECONDS;
-        if (!in_array($this->unitType, Settings::ALL_UNIT_TYPES)) {
+        if (!in_array($this->unitType, Settings::ALL_UNIT_TYPES, true)) {
             throw BackoffInitialisationException::invalidUnitType($this->unitType);
         }
 
@@ -175,8 +175,8 @@ trait BackoffStrategyTrait
         $this->instantiatedAt = new DateTime();
         $this->firstAttemptOccurredAt = null;
 
-        // working variables used for testing
-        $this->testDelayTracker = null;
+        // used to track delays, for testing
+        $this->delayTracker = null;
 
         return $this;
     }
@@ -218,46 +218,53 @@ trait BackoffStrategyTrait
 
 
     /**
+     * Proceed to the next attempt.
+     *
+     * @param boolean $sleep Whether to perform the sleep or not.
+     * @return boolean
+     */
+    public function step(bool $sleep = true): bool
+    {
+        // set $this->sleepStart here as the first thing, for increased accuracy
+        $this->sleepStart = hrtime(true);
+
+        return $sleep
+            ? $this->proceed() && $this->sleep()
+            : $this->proceed();
+    }
+
+
+
+
+
+    /**
      * Record that this backoff strategy has started.
      *
      * @return void
      */
-    private function start(): void
+    private function starting(): void
     {
         // start the logs again if this is the first attempt
         if (!$this->started) {
             $this->attemptLogs = [];
         }
+
+        // don't start if we've already stopped (i.e. 0 attempts)
+        if ($this->stopped) {
+            return;
+        }
+
         $this->started = true;
     }
 
     /**
-     * Run a step of the backoff process.
+     * Proceed to the next attempt (if allowed).
      *
      * @return boolean
      */
-    public function step(): bool
+    private function proceed(): bool
     {
-        // set $this->sleepStart here as the first thing, for increased accuracy
-        $this->sleepStart = hrtime(true);
-
-        $this->calculate();
-
-        return $this->sleep();
-    }
-
-
-
-
-
-    /**
-     * Calculate the delay needed before retrying an action next.
-     *
-     * @return boolean
-     */
-    public function calculate(): bool
-    {
-        $this->start();
+        $this->starting();
 
         // don't continue if we've already stopped
         if ($this->stopped) {
@@ -271,12 +278,13 @@ trait BackoffStrategyTrait
             return true;
         }
 
-//        /* * @infection-ignore-all $this->attemptNumber = 1; */
+        /** @infe ction-ignore-all $this->attemptNumber = 1; */
         $this->attemptNumber ??= 1;
         $this->attemptNumber++;
 
         if (!$this->canContinue()) {
             $this->stopped = true;
+            $this->attemptNumber--; // don't count this attempt
             return false;
         }
 
@@ -297,11 +305,11 @@ trait BackoffStrategyTrait
 
 
 
-        $this->start();
+        $this->delayTracker?->recordSleepCall();
 
 
 
-        $this->testDelayTracker?->recordSleepCall();
+        $this->starting();
 
         if ($this->stopped) {
             return false;
@@ -309,12 +317,13 @@ trait BackoffStrategyTrait
 
 
 
-        $this->testDelayTracker?->recordDelay($this->getDelay());
-        $this->testDelayTracker?->recordDelayInSeconds($this->getDelayInSeconds());
-        $this->testDelayTracker?->recordDelayInMs($this->getDelayInMs());
-        $this->testDelayTracker?->recordDelayInUs($this->getDelayInUs());
-
         $microsecondDelay = $this->getDelayInUs();
+
+        $this->delayTracker?->recordDelay($this->getDelay());
+        $this->delayTracker?->recordDelayInSeconds($this->getDelayInSeconds());
+        $this->delayTracker?->recordDelayInMs($this->getDelayInMs());
+        $this->delayTracker?->recordDelayInUs($microsecondDelay);
+
         if (is_null($microsecondDelay)) {
             return true; // no delay has been calculated yet
         }
@@ -330,7 +339,7 @@ trait BackoffStrategyTrait
     /**
      * Sleep until a specific time, in nanoseconds.
      *
-     * @infection-ignore-all many things
+     * @infe ction-ignore-all many things
      *
      * @param integer       $start        The hrtime(true) start time.
      * @param integer|float $microseconds The number of microseconds to sleep for (will be converted to nanoseconds).
@@ -338,8 +347,8 @@ trait BackoffStrategyTrait
      */
     private function performSleep(int $start, int|float $microseconds): void
     {
-        if ($this->testDelayTracker) {
-            $this->testDelayTracker->recordActualSleep();
+        if (!is_null($this->delayTracker)) {
+            $this->delayTracker->recordActualSleep();
             return;
         }
 
@@ -393,13 +402,14 @@ trait BackoffStrategyTrait
      */
     public function startOfAttempt(): static
     {
-        $this->start();
+        $this->starting();
 
         if ($this->stopped) {
             throw BackoffRuntimeException::startOfAttemptNotAllowed();
         }
 
-        $attemptNumber = $this->currentAttemptNumber();
+        // (will always be an integer because $this->stopped is checked for above)
+        $attemptNumber = (int) $this->currentAttemptNumber();
 
         // start the logs again if this is the first attempt
         if ($attemptNumber <= 1) {
@@ -413,8 +423,8 @@ trait BackoffStrategyTrait
         $this->attemptLogs[$attemptNumber] = new AttemptLog(
             $attemptNumber,
             $this->maxAttempts,
-            $this->firstAttemptOccurredAt ?? $this->instantiatedAt,
-            $this->firstAttemptOccurredAt ?? $this->instantiatedAt,
+            $this->firstAttemptOccurredAt ?? $this->instantiatedAt, // start with this, updated below
+            $this->firstAttemptOccurredAt ?? $this->instantiatedAt, // start with this, updated below
             null, // not known yet
             null, // not known yet
             $this->delayCalculator()->getJitteredDelay($attemptNumber - 1),
@@ -431,7 +441,7 @@ trait BackoffStrategyTrait
             $this->attemptLogs[$attemptNumber]->setFirstAttemptOccurredAt($this->firstAttemptOccurredAt);
         }
 
-        $occurredAt = ($attemptNumber == 1) && $this->firstAttemptOccurredAt
+        $occurredAt = ($attemptNumber == 1) && !is_null($this->firstAttemptOccurredAt)
             ? $this->firstAttemptOccurredAt
             : new DateTime();
         $this->attemptLogs[$attemptNumber]->setThisAttemptOccurredAt($occurredAt);
@@ -486,7 +496,7 @@ trait BackoffStrategyTrait
 
         // add this new working time, to the overall working time
         $prevAttemptLog = $this->attemptLogs[$attemptLog->attemptNumber() - 1] ?? null;
-        if ($prevAttemptLog) {
+        if (!is_null($prevAttemptLog)) {
             $diffInUnits += $prevAttemptLog->overallWorkingTime();
         }
         $attemptLog->setOverallWorkingTime($diffInUnits);
@@ -536,6 +546,16 @@ trait BackoffStrategyTrait
     }
 
     /**
+     * Check if the backoff strategy should stop.
+     *
+     * @return boolean
+     */
+    public function hasStopped(): bool
+    {
+        return $this->stopped;
+    }
+
+    /**
      * Determine if the number of attempts has been exceeded.
      *
      * @return boolean
@@ -547,7 +567,7 @@ trait BackoffStrategyTrait
         }
 
         // check if the backoff strategy thinks it's time to stop
-        $retryNumber = $this->attemptNumber - 1;
+        $retryNumber = (int) $this->currentRetryNumber();
         if ($this->delayCalculator()->shouldStop($retryNumber)) {
             return false;
         }
@@ -560,33 +580,39 @@ trait BackoffStrategyTrait
 
 
     /**
-     * Check if the backoff strategy should stop.
-     *
-     * @return boolean
-     */
-    public function hasStopped(): bool
-    {
-        return $this->stopped;
-    }
-
-    /**
      * Retrieve the current attempt number.
      *
-     * @return integer
+     * @return integer|null
      */
-    public function currentAttemptNumber(): int
+    public function currentAttemptNumber(): ?int
     {
-        return $this->attemptNumber ?? 1;
+        // hasn't started yet
+        if ((!$this->started) && ($this->runsAtStartOfLoop)) {
+            return null;
+        }
+
+        if (!is_null($this->attemptNumber)) {
+            return $this->attemptNumber;
+        }
+
+        // has stopped
+        return !$this->stopped
+            ? 1
+            : null;
     }
 
     /**
      * Retrieve the current retry number.
      *
-     * @return integer
+     * @return integer|null
      */
-    private function currentRetryNumber(): int
+    private function currentRetryNumber(): ?int
     {
-        return ($this->attemptNumber ?? 1) - 1;
+        $attemptNumber = $this->currentAttemptNumber();
+
+        return !is_null($attemptNumber)
+            ? $attemptNumber - 1
+            : null;
     }
 
     /**
@@ -606,13 +632,13 @@ trait BackoffStrategyTrait
      */
     public function isLastAttempt(): bool
     {
-        $this->start();
+        $this->starting();
 
         if ($this->stopped) {
             return true;
         }
 
-        $nextRetryNumber = $this->currentRetryNumber() + 1;
+        $nextRetryNumber = (int) $this->currentRetryNumber() + 1;
 
         if ($this->delayCalculator()->shouldStop($nextRetryNumber)) {
             return true;
@@ -646,10 +672,13 @@ trait BackoffStrategyTrait
      */
     public function getDelay(): int|float|null
     {
-        $this->start();
+        $this->starting();
+
+        // (will always be an integer because $this->stopped is checked before using below)
+        $retryNumber = (int) $this->currentRetryNumber();
 
         return !$this->stopped
-            ? $this->delayCalculator()->getJitteredDelay($this->currentRetryNumber())
+            ? $this->delayCalculator()->getJitteredDelay($retryNumber)
             : null;
     }
 
@@ -768,7 +797,7 @@ trait BackoffStrategyTrait
             return [];
         }
 
-        $this->start();
+        $this->starting();
 
         $return = [];
         for ($retryNumber = $retryStart; $retryNumber <= $retryStop; $retryNumber++) {
@@ -790,24 +819,34 @@ trait BackoffStrategyTrait
 
 
     /**
-     * Run through the backoff process and report the results.
+     * Use a DelayTracker to track delays.
      *
-     * @internal - For testing purposes.
+     * @internal - For package testing purposes.
+     *
+     * @return DelayTracker
+     */
+    public function useTracker(): DelayTracker
+    {
+        return $this->delayTracker = new DelayTracker();
+    }
+
+    /**
+     * Run through the backoff process and report the results using a DelayTracker instance.
+     *
+     * @internal - For package testing purposes.
      *
      * @param integer $maxSteps The maximum number of steps to run through.
-     * @return TestDelayTracker
+     * @return DelayTracker
      */
-    public function generateTestSequence(int $maxSteps): TestDelayTracker
+    public function generateTestSequence(int $maxSteps): DelayTracker
     {
-        $this->testDelayTracker = new TestDelayTracker();
+        $delayTracker = $this->useTracker();
 
-        /** @infection-ignore-all $count-- */
+        /** @infe ction-ignore-all $count-- */
         for ($count = 0; $count < $maxSteps; $count++) {
-            if (!$this->step()) {
-                break;
-            }
+            $this->step();
         }
 
-        return $this->testDelayTracker;
+        return $delayTracker;
     }
 }

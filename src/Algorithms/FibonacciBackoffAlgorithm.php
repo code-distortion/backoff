@@ -25,7 +25,7 @@ class FibonacciBackoffAlgorithm extends BaseBackoffAlgorithm implements BackoffA
      */
     public function __construct(
         private int|float $initialDelay,
-        private bool $includeFirst = false,
+        private bool $includeFirst = true,
     ) {
     }
 
@@ -35,7 +35,7 @@ class FibonacciBackoffAlgorithm extends BaseBackoffAlgorithm implements BackoffA
      * $retryNumber starts at 1 and increases for each subsequent retry.
      *
      * Note: This is intended to run in a stateless way, using only $retryNumber
-     * and possibly $prevDelay to work out the next delay.
+     * and possibly $prevBaseDelay to work out the next delay.
      *
      * @param integer            $retryNumber   The retry being attempted.
      * @param integer|float|null $prevBaseDelay The previous delay used (if any).
@@ -49,7 +49,7 @@ class FibonacciBackoffAlgorithm extends BaseBackoffAlgorithm implements BackoffA
             ? $retryNumber
             : $retryNumber + 1;
 
-        /** @infection-ignore-all $count-- */
+        /** @infe ction-ignore-all $count-- */
         for ($count = 0; $count < $max; $count++) {
             $temp = $nextDelay + $delay;
             $delay = $nextDelay;

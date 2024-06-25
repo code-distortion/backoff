@@ -1,11 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CodeDistortion\Backoff\Support;
 
 /**
  * Class that tracks delay info, for use while testing.
  */
-class TestDelayTracker
+class DelayTracker
 {
     /** @var array<integer|float|null> The delays recorded for testing purposes. */
     private array $recordedDelays = [];

@@ -6,7 +6,7 @@ namespace CodeDistortion\Backoff\Tests\Unit;
 
 use CodeDistortion\Backoff\Backoff;
 use CodeDistortion\Backoff\Tests\PHPUnitTestCase;
-use CodeDistortion\Backoff\Traits\BackoffDecoratorTrait;
+use CodeDistortion\Backoff\Traits\BackoffStrategyDecoratorTrait;
 use CodeDistortion\Backoff\Traits\BackoffRunnerTrait;
 use CodeDistortion\Backoff\Traits\BackoffStrategyTrait;
 use PHPUnit\Framework\Attributes\Test;
@@ -16,7 +16,7 @@ use PHPUnit\Framework\Attributes\Test;
  *
  * @phpcs:disable PSR1.Methods.CamelCapsMethodName.NotCamelCaps
  */
-class BackoffClassesUnitTest extends PHPUnitTestCase
+class BackoffTraitUsageUnitTest extends PHPUnitTestCase
 {
     /**
      * Check to make sure the backoff classes use the correct traits.
@@ -29,7 +29,7 @@ class BackoffClassesUnitTest extends PHPUnitTestCase
     public static function test_that_classes_use_the_correct_traits(): void
     {
         $traits = class_uses(Backoff::class);
-        self::assertArrayHasKey(BackoffDecoratorTrait::class, $traits);
+        self::assertArrayHasKey(BackoffStrategyDecoratorTrait::class, $traits);
         self::assertArrayHasKey(BackoffRunnerTrait::class, $traits);
         self::assertArrayHasKey(BackoffStrategyTrait::class, $traits);
     }

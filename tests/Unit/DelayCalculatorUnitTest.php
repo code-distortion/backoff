@@ -75,6 +75,10 @@ class DelayCalculatorUnitTest extends PHPUnitTestCase
     #[Test]
     public static function test_that_get_base_delay_uses_the_algorithm(): void
     {
+        $makeNumeric = fn(int|float|null $value): int|float => is_numeric($value)
+            ? $value
+            : 0;
+
         $delayCalculator = new DelayCalculator(
             new SequenceBackoffAlgorithm([1, 1.5, 4, 8]),
             new FullJitter(),
@@ -95,7 +99,9 @@ class DelayCalculatorUnitTest extends PHPUnitTestCase
 
         // test that the previous delay is passed to the algorithm
         $delayCalculator = new DelayCalculator(
-            new CallbackBackoffAlgorithm(fn(int $retryNumber, int|float|null $prevBaseDelay) => $prevBaseDelay + 2),
+            new CallbackBackoffAlgorithm(
+                fn(int $retryNumber, int|float|null $prevBaseDelay) => $makeNumeric($prevBaseDelay) + 2
+            ),
             new FullJitter(),
             null,
             null,
@@ -152,6 +158,10 @@ class DelayCalculatorUnitTest extends PHPUnitTestCase
     #[Test]
     public static function test_that_get_base_delay_applies_immediate_first_retry(): void
     {
+        $makeNumeric = fn(int|float|null $value): int|float => is_numeric($value)
+            ? $value
+            : 0;
+
         $delayCalculator = new DelayCalculator(
             new SequenceBackoffAlgorithm([1, 1.5, 4, 8]),
             new FullJitter(),
@@ -173,7 +183,9 @@ class DelayCalculatorUnitTest extends PHPUnitTestCase
 
         // test that the previous delay is passed to the algorithm when $immediateFirstRetry is true
         $delayCalculator = new DelayCalculator(
-            new CallbackBackoffAlgorithm(fn(int $retryNumber, int|float|null $prevBaseDelay) => $prevBaseDelay + 2),
+            new CallbackBackoffAlgorithm(
+                fn(int $retryNumber, int|float|null $prevBaseDelay) => $makeNumeric($prevBaseDelay) + 2
+            ),
             new FullJitter(),
             null,
             null,

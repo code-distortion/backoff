@@ -17,9 +17,9 @@ abstract class BaseBackoffAlgorithm implements BackoffAlgorithmInterface
 
 
     /**
-     * Run through the sequence and report the delays given.
+     * Run through the sequence and report the generated delays as an array.
      *
-     * @internal - For testing purposes.
+     * @internal - For package testing purposes.
      *
      * @param integer $maxSteps The maximum number of steps to run through.
      * @return array<integer|float|null>
@@ -28,7 +28,7 @@ abstract class BaseBackoffAlgorithm implements BackoffAlgorithmInterface
     {
         $delays = [];
 
-        /** @infection-ignore-all $count-- */
+        /** @infe ction-ignore-all $count-- */
         $prevDelay = null;
         for ($count = 1; $count <= $maxSteps; $count++) {
             $delays[] = $prevDelay = $this->calculateBaseDelay($count, $prevDelay);

@@ -38,7 +38,7 @@ class CallbackBackoffAlgorithm extends BaseBackoffAlgorithm implements BackoffAl
      * $retryNumber starts at 1 and increases for each subsequent retry.
      *
      * Note: This is intended to run in a stateless way, using only $retryNumber
-     * and possibly $prevDelay to work out the next delay.
+     * and possibly $prevBaseDelay to work out the next delay.
      *
      * @param integer            $retryNumber   The retry being attempted.
      * @param integer|float|null $prevBaseDelay The previous delay used (if any).

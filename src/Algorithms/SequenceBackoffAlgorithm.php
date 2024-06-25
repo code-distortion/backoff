@@ -22,13 +22,29 @@ class SequenceBackoffAlgorithm extends BaseBackoffAlgorithm implements BackoffAl
     /**
      * Constructor
      *
-     * @param array<integer|float> $delays       The sequence of delays to use.
-     * @param integer|float|null   $continuation The delay to use (when present) after the sequence has been exhausted.
+     * @param array<integer|float> $delays The sequence of delays to use.
+     * @param boolean              $repeat Repeat the last delay indefinitely if more retries are needed.
      */
     public function __construct(
         private array $delays,
-        private int|float|null $continuation = null,
+        private bool $repeat = false,
     ) {
+        // even though the array is typed above as array<integer|float>
+        // allow for it to have nulls (for static analysis), then check for and remove them
+        /** @var array<integer|float|null> $delays */
+
+        // ensure the array is indexed from 0
+        // so that it's easier for calculateBaseDelay to work with it
+        $delays = array_values($delays);
+
+        // if null is present in the array, remove it and all following delays
+        $index = array_search(null, $delays, true);
+        if (is_int($index)) {
+            array_splice($delays, $index);
+        }
+
+        /** @var array<integer|float> $delays */
+        $this->delays = $delays;
     }
 
     /**
@@ -37,7 +53,7 @@ class SequenceBackoffAlgorithm extends BaseBackoffAlgorithm implements BackoffAl
      * $retryNumber starts at 1 and increases for each subsequent retry.
      *
      * Note: This is intended to run in a stateless way, using only $retryNumber
-     * and possibly $prevDelay to work out the next delay.
+     * and possibly $prevBaseDelay to work out the next delay.
      *
      * @param integer            $retryNumber   The retry being attempted.
      * @param integer|float|null $prevBaseDelay The previous delay used (if any).
@@ -45,6 +61,20 @@ class SequenceBackoffAlgorithm extends BaseBackoffAlgorithm implements BackoffAl
      */
     public function calculateBaseDelay(int $retryNumber, int|float|null $prevBaseDelay): int|float|null
     {
-        return $this->delays[$retryNumber - 1] ?? $this->continuation;
+        // use the delay from the array if it exists
+        $index = $retryNumber - 1;
+        if (array_key_exists($index, $this->delays)) {
+            return $this->delays[$index];
+        }
+
+        // repeat the last delay
+        if (($this->repeat) && ((bool) count($this->delays))) {
+            $last = end($this->delays);
+            return $last !== false
+                ? $last
+                : null;
+        }
+
+        return null;
     }
 }

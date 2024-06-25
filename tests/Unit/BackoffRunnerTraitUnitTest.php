@@ -11,10 +11,6 @@ use CodeDistortion\Backoff\Exceptions\BackoffRuntimeException;
 use CodeDistortion\Backoff\Jitter\FullJitter;
 use CodeDistortion\Backoff\Settings;
 use CodeDistortion\Backoff\Tests\PHPUnitTestCase;
-use CodeDistortion\Backoff\Tests\Unit\Support\InvokableClass;
-use CodeDistortion\Backoff\Tests\Unit\Support\OtherExcptn1;
-use CodeDistortion\Backoff\Tests\Unit\Support\OtherExcptn2;
-use CodeDistortion\Backoff\Tests\Unit\Support\OtherExcptn3;
 use DateTime;
 use Exception;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -23,892 +19,12 @@ use stdClass;
 use Throwable;
 
 /**
- * Test the BackoffRunnerTrait.
+ * Test the BackoffRunnerTrait - test the general backoff-runner functionality.
  *
  * @phpcs:disable PSR1.Methods.CamelCapsMethodName.NotCamelCaps
  */
 class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
 {
-    /**
-     * Test that Backoff catches exceptions and retries because of them.
-     *
-     * @test
-     * @dataProvider backoffRetryExceptionsDataProvider
-     *
-     * @param callable                                                      $attempt             The callback to
-     *                                                                                           attempt.
-     * @param boolean                                                       $resetCatchAllExcptn Whether to start by
-     *                                                                                           resetting the default
-     *                                                                                           catch-all exceptions,
-     *                                                                                           so none are caught
-     *                                                                                           initially.
-     * @param class-string|callable|array<class-string|callable>|false|null $retryExceptions1    The exceptions to
-     *                                                                                           retry on (if present).
-     * @param class-string|callable|array<class-string|callable>|false|null $retryExceptions2    The exceptions to retry
-     *                                                                                           on (allowing another
-     *                                                                                           call if present).
-     * @param integer                                                       $expectedAttempts    The number of attempts
-     *                                                                                           expected.
-     * @param mixed                                                         $expectedResult      The expected return
-     *                                                                                           value.
-     * @param Throwable|null                                                $expectedException   The expected exception
-     *                                                                                           to be caught.
-     * @param boolean                                                       $expectRuntimeExcptn Whether a
-     *                                                                                           BackoffRuntimeException
-     *                                                                                           is expected (internal
-     *                                                                                           error).
-     * @return void
-     */
-    #[Test]
-    #[DataProvider('backoffRetryExceptionsDataProvider')]
-    public static function test_that_backoff_catches_exceptions_and_retries_because_of_them(
-        callable $attempt,
-        bool $resetCatchAllExcptn,
-        string|callable|array|false|null $retryExceptions1,
-        string|callable|array|false|null $retryExceptions2,
-        int $expectedAttempts,
-        mixed $expectedResult,
-        ?Throwable $expectedException,
-        bool $expectRuntimeExcptn,
-    ): void {
-
-        $count = 0;
-        $wrappedAttempt = function () use (&$count, $attempt) {
-            $count++;
-            return $attempt();
-        };
-
-        // set up the backoff
-        $backoff = Backoff::noop()->maxAttempts(5);
-
-        if ($resetCatchAllExcptn) {
-            $backoff->dontRetryExceptions();
-        }
-
-        if (!is_null($retryExceptions1)) {
-            $backoff->retryExceptions($retryExceptions1);
-        }
-        if (!is_null($retryExceptions2)) {
-            $backoff->retryExceptions($retryExceptions2);
-        }
-
-        // use the backoff to attempt the callback
-        $result = null;
-        $caughtException = null;
-        $caughtRuntimeException = false;
-        try {
-            $result = $backoff->attempt($wrappedAttempt);
-        } catch (BackoffRuntimeException) {
-            $caughtRuntimeException = true;
-        } catch (Throwable $e) {
-            $caughtException = $e;
-        }
-
-        self::assertSame($expectedAttempts, $count);
-        self::assertSame($expectedResult, $result);
-        if ($expectRuntimeExcptn) {
-            self::assertTrue($caughtRuntimeException);
-        } else {
-            self::assertSame($expectedException, $caughtException);
-            self::assertFalse($caughtRuntimeException);
-        }
-    }
-
-    /**
-     * DataProvider for test_that_backoff_catches_exceptions_and_retries_because_of_them.
-     *
-     * @return array<string,array<string,callable|boolean|class-string|array<class-string|callable>|boolean|null|int|Throwable|boolean>>
-     * @throws Exception Doesn't actually throw this, however phpcs expects it.
-     */
-    public static function backoffRetryExceptionsDataProvider(): array
-    {
-        $randInt = mt_rand();
-        $throwUntilAttempt = function ($throwUntil, $return, $throw) {
-            return function () use (&$throwUntil, $return, $throw): mixed {
-                return --$throwUntil <= 0
-                    ? $return
-                    : throw $throw;
-            };
-        };
-        $backoffException = new BackoffException();
-        $regularException = new Exception();
-        $retryExceptionsCallback = fn($return) => (fn(Throwable $e, AttemptLog $attemptLog) => $return);
-
-        return [
-
-            // successful attempts
-
-            'successful attempt - no catch' => [
-                'attempt' => fn() => $randInt,
-                'resetCatchAllExcptn' => true,
-                'retryExceptions1' => null,
-                'retryExceptions2' => null,
-                'expectedAttempts' => 1,
-                'expectedResult' => $randInt,
-                'expectedException' => null,
-                'expectRuntimeExcptn' => false,
-            ],
-            'successful attempt - catch false' => [
-                'attempt' => fn() => $randInt,
-                'resetCatchAllExcptn' => true,
-                'retryExceptions1' => false,
-                'retryExceptions2' => null,
-                'expectedAttempts' => 1,
-                'expectedResult' => $randInt,
-                'expectedException' => null,
-                'expectRuntimeExcptn' => false,
-            ],
-            'successful attempt - catch all' => [
-                'attempt' => fn() => $randInt,
-                'resetCatchAllExcptn' => false, // <<< don't reset so none are caught, just use the default
-                'retryExceptions1' => [],
-                'retryExceptions2' => null,
-                'expectedAttempts' => 1,
-                'expectedResult' => $randInt,
-                'expectedException' => null,
-                'expectRuntimeExcptn' => false,
-            ],
-            'successful attempt - catch all 2' => [
-                'attempt' => fn() => $randInt,
-                'resetCatchAllExcptn' => true,
-                'retryExceptions1' => [],
-                'retryExceptions2' => null,
-                'expectedAttempts' => 1,
-                'expectedResult' => $randInt,
-                'expectedException' => null,
-                'expectRuntimeExcptn' => false,
-            ],
-            'successful attempt - catch OtherExcptn1' => [
-                'attempt' => fn() => $randInt,
-                'resetCatchAllExcptn' => true,
-                'retryExceptions1' => OtherExcptn1::class,
-                'retryExceptions2' => null,
-                'expectedAttempts' => 1,
-                'expectedResult' => $randInt,
-                'expectedException' => null,
-                'expectRuntimeExcptn' => false,
-            ],
-            'successful attempt - catch BackoffException' => [
-                'attempt' => fn() => $randInt,
-                'resetCatchAllExcptn' => true,
-                'retryExceptions1' => BackoffException::class,
-                'retryExceptions2' => null,
-                'expectedAttempts' => 1,
-                'expectedResult' => $randInt,
-                'expectedException' => null,
-                'expectRuntimeExcptn' => false,
-            ],
-            'successful attempt - catch via callback returning true' => [
-                'attempt' => fn() => $randInt,
-                'resetCatchAllExcptn' => true,
-                'retryExceptions1' => $retryExceptionsCallback(true),
-                'retryExceptions2' => null,
-                'expectedAttempts' => 1,
-                'expectedResult' => $randInt,
-                'expectedException' => null,
-                'expectRuntimeExcptn' => false,
-            ],
-            'successful attempt - catch via callback returning false' => [
-                'attempt' => fn() => $randInt,
-                'resetCatchAllExcptn' => true,
-                'retryExceptions1' => $retryExceptionsCallback(false),
-                'retryExceptions2' => null,
-                'expectedAttempts' => 1,
-                'expectedResult' => $randInt,
-                'expectedException' => null,
-                'expectRuntimeExcptn' => false,
-            ],
-
-
-
-            // unsuccessful attempts
-
-            'unsuccessful attempts - no catch' => [
-                'attempt' => fn() => throw $backoffException,
-                'resetCatchAllExcptn' => true,
-                'retryExceptions1' => null,
-                'retryExceptions2' => null,
-                'expectedAttempts' => 1,
-                'expectedResult' => null,
-                'expectedException' => $backoffException,
-                'expectRuntimeExcptn' => false,
-            ],
-            'unsuccessful attempts - catch false' => [
-                'attempt' => fn() => throw $backoffException,
-                'resetCatchAllExcptn' => true,
-                'retryExceptions1' => false,
-                'retryExceptions2' => null,
-                'expectedAttempts' => 1,
-                'expectedResult' => null,
-                'expectedException' => $backoffException,
-                'expectRuntimeExcptn' => false,
-            ],
-            'unsuccessful attempts - catch all' => [
-                'attempt' => fn() => throw $backoffException,
-                'resetCatchAllExcptn' => false, // <<< don't reset so none are caught, just use the default
-                'retryExceptions1' => null,
-                'retryExceptions2' => null,
-                'expectedAttempts' => 5,
-                'expectedResult' => null,
-                'expectedException' => $backoffException,
-                'expectRuntimeExcptn' => false,
-            ],
-            'unsuccessful attempts - catch all 2' => [
-                'attempt' => fn() => throw $backoffException,
-                'resetCatchAllExcptn' => true,
-                'retryExceptions1' => [],
-                'retryExceptions2' => null,
-                'expectedAttempts' => 5,
-                'expectedResult' => null,
-                'expectedException' => $backoffException,
-                'expectRuntimeExcptn' => false,
-            ],
-            'unsuccessful attempts - catch OtherExcptn1' => [
-                'attempt' => fn() => throw $backoffException,
-                'resetCatchAllExcptn' => true,
-                'retryExceptions1' => OtherExcptn1::class,
-                'retryExceptions2' => null,
-                'expectedAttempts' => 1,
-                'expectedResult' => null,
-                'expectedException' => $backoffException,
-                'expectRuntimeExcptn' => false,
-            ],
-            'unsuccessful attempts - catch BackoffException' => [
-                'attempt' => fn() => throw $backoffException,
-                'resetCatchAllExcptn' => true,
-                'retryExceptions1' => BackoffException::class,
-                'retryExceptions2' => null,
-                'expectedAttempts' => 5,
-                'expectedResult' => null,
-                'expectedException' => $backoffException,
-                'expectRuntimeExcptn' => false,
-            ],
-            'unsuccessful attempts - catch via callback returning true' => [
-                'attempt' => fn() => throw $backoffException,
-                'resetCatchAllExcptn' => true,
-                'retryExceptions1' => $retryExceptionsCallback(true),
-                'retryExceptions2' => null,
-                'expectedAttempts' => 5,
-                'expectedResult' => null,
-                'expectedException' => $backoffException,
-                'expectRuntimeExcptn' => false,
-            ],
-            'unsuccessful attempts - catch via callback returning false' => [
-                'attempt' => fn() => throw $regularException,
-                'resetCatchAllExcptn' => true,
-                'retryExceptions1' => $retryExceptionsCallback(false),
-                'retryExceptions2' => null,
-                'expectedAttempts' => 1,
-                'expectedResult' => null,
-                'expectedException' => $regularException,
-                'expectRuntimeExcptn' => false,
-            ],
-
-
-
-            // successful attempts after 3 tries
-
-            'successful attempt after 3 - no catch' => [
-                'attempt' => $throwUntilAttempt(3, $randInt, $backoffException),
-                'resetCatchAllExcptn' => true,
-                'retryExceptions1' => null,
-                'retryExceptions2' => null,
-                'expectedAttempts' => 1,
-                'expectedResult' => null,
-                'expectedException' => $backoffException,
-                'expectRuntimeExcptn' => false,
-            ],
-            'successful attempt after 3 - catch false' => [
-                'attempt' => $throwUntilAttempt(3, $randInt, $backoffException),
-                'resetCatchAllExcptn' => true,
-                'retryExceptions1' => false,
-                'retryExceptions2' => null,
-                'expectedAttempts' => 1,
-                'expectedResult' => null,
-                'expectedException' => $backoffException,
-                'expectRuntimeExcptn' => false,
-            ],
-            'successful attempt after 3 - catch all' => [
-                'attempt' => $throwUntilAttempt(3, $randInt, $backoffException),
-                'resetCatchAllExcptn' => false, // <<< don't reset so none are caught, just use the default
-                'retryExceptions1' => [],
-                'retryExceptions2' => null,
-                'expectedAttempts' => 3,
-                'expectedResult' => $randInt,
-                'expectedException' => null,
-                'expectRuntimeExcptn' => false,
-            ],
-            'successful attempt after 3 - catch all 2' => [
-                'attempt' => $throwUntilAttempt(3, $randInt, $backoffException),
-                'resetCatchAllExcptn' => true,
-                'retryExceptions1' => [],
-                'retryExceptions2' => null,
-                'expectedAttempts' => 3,
-                'expectedResult' => $randInt,
-                'expectedException' => null,
-                'expectRuntimeExcptn' => false,
-            ],
-            'successful attempt after 3 - catch OtherExcptn1' => [
-                'attempt' => $throwUntilAttempt(3, $randInt, $backoffException),
-                'resetCatchAllExcptn' => true,
-                'retryExceptions1' => OtherExcptn1::class,
-                'retryExceptions2' => null,
-                'expectedAttempts' => 1,
-                'expectedResult' => null,
-                'expectedException' => $backoffException,
-                'expectRuntimeExcptn' => false,
-            ],
-            'successful attempt after 3 - catch BackoffException' => [
-                'attempt' => $throwUntilAttempt(3, $randInt, $backoffException),
-                'resetCatchAllExcptn' => true,
-                'retryExceptions1' => BackoffException::class,
-                'retryExceptions2' => null,
-                'expectedAttempts' => 3,
-                'expectedResult' => $randInt,
-                'expectedException' => null,
-                'expectRuntimeExcptn' => false,
-            ],
-            'successful attempt after 3 - catch via callback returning true' => [
-                'attempt' => $throwUntilAttempt(3, $randInt, $backoffException),
-                'resetCatchAllExcptn' => true,
-                'retryExceptions1' => $retryExceptionsCallback(true),
-                'retryExceptions2' => null,
-                'expectedAttempts' => 3,
-                'expectedResult' => $randInt,
-                'expectedException' => null,
-                'expectRuntimeExcptn' => false,
-            ],
-            'successful attempt after 3 - catch via callback returning false' => [
-                'attempt' => $throwUntilAttempt(3, $randInt, $regularException),
-                'resetCatchAllExcptn' => true,
-                'retryExceptions1' => $retryExceptionsCallback(false),
-                'retryExceptions2' => null,
-                'expectedAttempts' => 1,
-                'expectedResult' => null,
-                'expectedException' => $regularException,
-                'expectRuntimeExcptn' => false,
-            ],
-
-
-
-            // unsuccessful attempts
-            // catch multiple things
-
-            'unsuccessful attempts - catch OtherExcptn1 and OtherExcptn2' => [
-                'attempt' => fn() => throw $backoffException,
-                'resetCatchAllExcptn' => true,
-                'retryExceptions1' => [OtherExcptn1::class, OtherExcptn2::class],
-                'retryExceptions2' => null,
-                'expectedAttempts' => 1,
-                'expectedResult' => null,
-                'expectedException' => $backoffException,
-                'expectRuntimeExcptn' => false,
-            ],
-            'unsuccessful attempts - catch OtherExcptn1 and BackoffException' => [
-                'attempt' => fn() => throw $backoffException,
-                'resetCatchAllExcptn' => true,
-                'retryExceptions1' => [OtherExcptn1::class, BackoffException::class],
-                'retryExceptions2' => null,
-                'expectedAttempts' => 5,
-                'expectedResult' => null,
-                'expectedException' => $backoffException,
-                'expectRuntimeExcptn' => false,
-            ],
-
-            // catch defined with an array
-
-            'unsuccessful attempts - catch OtherExcptn1, OtherExcptn2 and OtherExcptn2' => [
-                'attempt' => fn() => throw $backoffException,
-                'resetCatchAllExcptn' => true,
-                'retryExceptions1' => [OtherExcptn1::class, OtherExcptn2::class, OtherExcptn3::class],
-                'retryExceptions2' => null,
-                'expectedAttempts' => 1,
-                'expectedResult' => null,
-                'expectedException' => $backoffException,
-                'expectRuntimeExcptn' => false,
-            ],
-            'unsuccessful attempts - catch OtherExcptn1, OtherExcptn2 and BackoffException' => [
-                'attempt' => fn() => throw $backoffException,
-                'resetCatchAllExcptn' => true,
-                'retryExceptions1' => [OtherExcptn1::class, OtherExcptn2::class, BackoffException::class],
-                'retryExceptions2' => null,
-                'expectedAttempts' => 5,
-                'expectedResult' => null,
-                'expectedException' => $backoffException,
-                'expectRuntimeExcptn' => false,
-            ],
-            'unsuccessful attempts - catch OtherExcptn1, OtherExcptn2 and callback returning false' => [
-                'attempt' => fn() => throw $regularException,
-                'resetCatchAllExcptn' => true,
-                'retryExceptions1' => [OtherExcptn1::class, OtherExcptn2::class, $retryExceptionsCallback(false)],
-                'retryExceptions2' => null,
-                'expectedAttempts' => 1,
-                'expectedResult' => null,
-                'expectedException' => $regularException,
-                'expectRuntimeExcptn' => false,
-            ],
-            'unsuccessful attempts - catch OtherExcptn1, OtherExcptn2 and callback returning true' => [
-                'attempt' => fn() => throw $backoffException,
-                'resetCatchAllExcptn' => true,
-                'retryExceptions1' => [OtherExcptn1::class, OtherExcptn2::class, $retryExceptionsCallback(true)],
-                'retryExceptions2' => null,
-                'expectedAttempts' => 5,
-                'expectedResult' => null,
-                'expectedException' => $backoffException,
-                'expectRuntimeExcptn' => false,
-            ],
-
-
-
-            // test that calling multiple ->retryExceptions() multiple times adds to the list to check
-
-            'unsuccessful attempts - catch OtherExcptn1, OtherExcptn2, defined diff times' => [
-                'attempt' => fn() => throw $backoffException,
-                'resetCatchAllExcptn' => true,
-                'retryExceptions1' => OtherExcptn1::class,
-                'retryExceptions2' => [OtherExcptn2::class],
-                'expectedAttempts' => 1,
-                'expectedResult' => null,
-                'expectedException' => $backoffException,
-                'expectRuntimeExcptn' => false,
-            ],
-            'unsuccessful attempts - catch OtherExcptn1, OtherExcptn2 and BackoffException, defined diff times' => [
-                'attempt' => fn() => throw $backoffException,
-                'resetCatchAllExcptn' => true,
-                'retryExceptions1' => OtherExcptn1::class,
-                'retryExceptions2' => [OtherExcptn2::class, BackoffException::class],
-                'expectedAttempts' => 5,
-                'expectedResult' => null,
-                'expectedException' => $backoffException,
-                'expectRuntimeExcptn' => false,
-            ],
-            'unsuccessful attempts - catch BackoffException, OtherExcptn1, defined diff times' => [
-                'attempt' => fn() => throw $backoffException,
-                'resetCatchAllExcptn' => true,
-                'retryExceptions1' => BackoffException::class,
-                'retryExceptions2' => OtherExcptn1::class,
-                'expectedAttempts' => 5,
-                'expectedResult' => null,
-                'expectedException' => $backoffException,
-                'expectRuntimeExcptn' => false,
-            ],
-            'unsuccessful attempts - catch OtherExcptn1, then all, diff times' => [
-                'attempt' => fn() => throw $backoffException,
-                'resetCatchAllExcptn' => true,
-                'retryExceptions1' => OtherExcptn1::class,
-                'retryExceptions2' => [], // <<< catch all exceptions again
-                'expectedAttempts' => 5,
-                'expectedResult' => null,
-                'expectedException' => $backoffException,
-                'expectRuntimeExcptn' => false,
-            ],
-            'unsuccessful attempts - catch BackoffException, then false, diff times' => [
-                'attempt' => fn() => throw $backoffException,
-                'resetCatchAllExcptn' => true,
-                'retryExceptions1' => BackoffException::class,
-                'retryExceptions2' => false, // <<< reset and don't catch exceptions
-                'expectedAttempts' => 1,
-                'expectedResult' => null,
-                'expectedException' => $backoffException,
-                'expectRuntimeExcptn' => false,
-            ],
-        ];
-    }
-
-
-
-
-
-    /**
-     * Test that Backoff checks for invalid "retry when" values, and retries because of them.
-     *
-     * @test
-     * @dataProvider backoffRetryWhenResponseDataProvider
-     *
-     * @param callable   $attempt              The callback to attempt.
-     * @param mixed|null $invalidValues1       The exceptions to retry on (if present).
-     * @param boolean    $invalidValues1Strict Whether the 1st values should be checked strictly.
-     * @param mixed|null $invalidValues2       The exceptions to retry on (allowing another call if present).
-     * @param boolean    $invalidValues2Strict Whether the 2nd values should be checked strictly.
-     * @param integer    $expectedAttempts     The number of attempts expected.
-     * @param mixed      $expectedResult       The expected return value.
-     * @return void
-     */
-    #[Test]
-    #[DataProvider('backoffRetryWhenResponseDataProvider')]
-    public static function test_that_backoff_checks_for_invalid_retry_when_values_and_retries_because_of_them(
-        callable $attempt,
-        mixed $invalidValues1,
-        bool $invalidValues1Strict,
-        mixed $invalidValues2,
-        bool $invalidValues2Strict,
-        int $expectedAttempts,
-        mixed $expectedResult,
-    ): void {
-
-        $count = 0;
-        $wrappedAttempt = function () use (&$count, $attempt) {
-            $count++;
-            return $attempt();
-        };
-
-        // set up the backoff
-        $backoff = Backoff::noop()->maxAttempts(5);
-
-        if (!is_null($invalidValues1)) {
-            $backoff->retryWhen($invalidValues1, $invalidValues1Strict);
-        }
-        if (!is_null($invalidValues2)) {
-            $backoff->retryWhen($invalidValues2, $invalidValues2Strict);
-        }
-
-        // use the backoff to attempt the callback
-        $result = $backoff->attempt($wrappedAttempt);
-
-        self::assertSame($expectedAttempts, $count);
-        self::assertSame($expectedResult, $result);
-    }
-
-    /**
-     * DataProvider for test_that_backoff_check_for_invalid_values_and_retries_because_of_them.
-     *
-     * @return array<string,array<string,callable|integer|boolean|null|mixed>>
-     */
-    public static function backoffRetryWhenResponseDataProvider(): array
-    {
-        $randInt1 = mt_rand();
-
-        $default = [
-            'attempt' => fn() => $randInt1,
-            'invalidValues1' => null,
-            'invalidValues1Strict' => false,
-            'invalidValues2' => null,
-            'invalidValues2Strict' => false,
-            'expectedAttempts' => 1,
-            'expectedResult' => $randInt1,
-        ];
-
-        $return = [
-
-            // successful attempts
-
-            'successful attempt' => [],
-
-            // not strict
-            'successful attempt - valid 1' => [
-                'attempt' => fn() => $randInt1,
-                'invalidValues1' => $randInt1 + 1,
-                'expectedAttempts' => 1,
-            ],
-            'successful attempt - valid 2' => [
-                'attempt' => fn() => $randInt1,
-                'invalidValues1' => $randInt1 + 1,
-                'invalidValues2' => $randInt1 - 1,
-                'expectedAttempts' => 1,
-            ],
-            'successful attempt - invalid 1' => [
-                'attempt' => fn() => $randInt1,
-                'invalidValues1' => $randInt1,
-                'expectedAttempts' => 5,
-            ],
-            'successful attempt - invalid 2' => [
-                'attempt' => fn() => $randInt1,
-                'invalidValues1' => $randInt1 + 1,
-                'invalidValues2' => $randInt1,
-                'expectedAttempts' => 5,
-            ],
-
-            // strict
-            'successful attempt (strict) - valid 1' => [
-                'attempt' => fn() => $randInt1,
-                'invalidValues1' => $randInt1 + 1,
-                'invalidValues1Strict' => true,
-                'expectedAttempts' => 1,
-            ],
-            'successful attempt (strict) - valid 2' => [
-                'attempt' => fn() => $randInt1,
-                'invalidValues1' => $randInt1 + 1,
-                'invalidValues1Strict' => true,
-                'invalidValues2' => $randInt1 - 1,
-                'invalidValues2Strict' => true,
-                'expectedAttempts' => 1,
-            ],
-            'successful attempt (strict) - invalid 1' => [
-                'attempt' => fn() => $randInt1,
-                'invalidValues1' => $randInt1,
-                'invalidValues1Strict' => true,
-                'expectedAttempts' => 5,
-            ],
-            'successful attempt (strict) - invalid 2' => [
-                'attempt' => fn() => $randInt1,
-                'invalidValues1' => $randInt1 + 1,
-                'invalidValues1Strict' => true,
-                'invalidValues2' => $randInt1,
-                'invalidValues2Strict' => true,
-                'expectedAttempts' => 5,
-            ],
-
-            // strict 2
-            'successful attempt (strict 2) - valid 1' => [
-                'attempt' => fn() => $randInt1,
-                'invalidValues1' => (bool) $randInt1,
-                'invalidValues1Strict' => true,
-                'expectedAttempts' => 1,
-            ],
-            'successful attempt (strict 2) - valid 2' => [
-                'attempt' => fn() => $randInt1,
-                'invalidValues1' => (bool) $randInt1,
-                'invalidValues1Strict' => true,
-                'invalidValues2' => (float) $randInt1,
-                'invalidValues2Strict' => true,
-                'expectedAttempts' => 1,
-            ],
-            'successful attempt (strict 2) - invalid 1' => [
-                'attempt' => fn() => $randInt1,
-                'invalidValues1' => (int) $randInt1,
-                'invalidValues1Strict' => true,
-                'expectedAttempts' => 5,
-            ],
-            'successful attempt (strict 2) - invalid 2' => [
-                'attempt' => fn() => $randInt1,
-                'invalidValues1' => (bool) $randInt1,
-                'invalidValues1Strict' => true,
-                'invalidValues2' => (int) $randInt1,
-                'invalidValues2Strict' => true,
-                'expectedAttempts' => 5,
-            ],
-
-            // callback
-            'successful attempt (callback) - valid 1' => [
-                'attempt' => fn() => $randInt1,
-                'invalidValues1' => fn($value) => false,
-                'expectedAttempts' => 1,
-            ],
-            'successful attempt (callback) - valid 2' => [
-                'attempt' => fn() => $randInt1,
-                'invalidValues1' => fn($value) => false,
-                'invalidValues1Strict' => true, // strictness doesn't matter for callbacks
-                'expectedAttempts' => 1,
-            ],
-            'successful attempt (callback) - invalid 1' => [
-                'attempt' => fn() => $randInt1,
-                'invalidValues1' => fn($value) => true,
-                'expectedAttempts' => 5,
-            ],
-            'successful attempt (callback) - invalid 2' => [
-                'attempt' => fn() => $randInt1,
-                'invalidValues1' => fn($value) => true,
-                'invalidValues1Strict' => true, // strictness doesn't matter for callbacks
-                'expectedAttempts' => 5,
-            ],
-        ];
-
-        foreach ($return as $index => $value) {
-            $return[$index] = array_merge($default, $value);
-        }
-
-        return $return;
-    }
-
-
-
-
-
-    /**
-     * Test that Backoff checks for invalid "retry until" values, and retries because of them.
-     *
-     * @test
-     * @dataProvider backoffRetryUntilResponseDataProvider
-     *
-     * @param callable   $attempt            The callback to attempt.
-     * @param mixed|null $validValues1       The exceptions to retry until (if present).
-     * @param boolean    $validValues1Strict Whether the 1st values should be checked strictly.
-     * @param mixed|null $validValues2       The exceptions to retry until (allowing another call if present).
-     * @param boolean    $validValues2Strict Whether the 2nd values should be checked strictly.
-     * @param integer    $expectedAttempts   The number of attempts expected.
-     * @param mixed      $expectedResult     The expected return value.
-     * @return void
-     */
-    #[Test]
-    #[DataProvider('backoffRetryUntilResponseDataProvider')]
-    public static function test_that_backoff_checks_for_invalid_retry_until_values_and_retries_because_of_them(
-        callable $attempt,
-        mixed $validValues1,
-        bool $validValues1Strict,
-        mixed $validValues2,
-        bool $validValues2Strict,
-        int $expectedAttempts,
-        mixed $expectedResult,
-    ): void {
-
-        $count = 0;
-        $wrappedAttempt = function () use (&$count, $attempt) {
-            $count++;
-            return $attempt();
-        };
-
-        // set up the backoff
-        $backoff = Backoff::noop()->maxAttempts(5);
-
-        if (!is_null($validValues1)) {
-            $backoff->retryUntil($validValues1, $validValues1Strict);
-        }
-        if (!is_null($validValues2)) {
-            $backoff->retryUntil($validValues2, $validValues2Strict);
-        }
-
-        // use the backoff to attempt the callback
-        $result = $backoff->attempt($wrappedAttempt);
-
-        self::assertSame($expectedAttempts, $count);
-        self::assertSame($expectedResult, $result);
-    }
-
-    /**
-     * DataProvider for test_that_backoff_check_for_invalid_values_and_retries_because_of_them.
-     *
-     * @return array<string,array<string,callable|integer|boolean|null|mixed>>
-     */
-    public static function backoffRetryUntilResponseDataProvider(): array
-    {
-        $randInt1 = mt_rand();
-
-        $default = [
-            'attempt' => fn() => $randInt1,
-            'validValues1' => null,
-            'validValues1Strict' => false,
-            'validValues2' => null,
-            'validValues2Strict' => false,
-            'expectedAttempts' => 1,
-            'expectedResult' => $randInt1,
-        ];
-
-        $return = [
-
-            // successful attempts
-
-            'successful attempt' => [],
-
-            // not strict
-            'successful attempt - valid 1' => [
-                'attempt' => fn() => $randInt1,
-                'validValues1' => $randInt1,
-                'expectedAttempts' => 1,
-            ],
-            'successful attempt - valid 2' => [
-                'attempt' => fn() => $randInt1,
-                'validValues1' => $randInt1 + 1,
-                'validValues2' => $randInt1,
-                'expectedAttempts' => 1,
-            ],
-            'successful attempt - invalid 1' => [
-                'attempt' => fn() => $randInt1,
-                'validValues1' => $randInt1 + 1,
-                'expectedAttempts' => 5,
-            ],
-            'successful attempt - invalid 2' => [
-                'attempt' => fn() => $randInt1,
-                'validValues1' => $randInt1 - 1,
-                'validValues2' => $randInt1 + 1,
-                'expectedAttempts' => 5,
-            ],
-
-            // strict
-            'successful attempt (strict) - valid 1' => [
-                'attempt' => fn() => $randInt1,
-                'validValues1' => $randInt1,
-                'validValues1Strict' => true,
-                'expectedAttempts' => 1,
-            ],
-            'successful attempt (strict) - valid 2' => [
-                'attempt' => fn() => $randInt1,
-                'validValues1' => $randInt1 + 1,
-                'validValues1Strict' => true,
-                'validValues2' => $randInt1,
-                'validValues2Strict' => true,
-                'expectedAttempts' => 1,
-            ],
-            'successful attempt (strict) - invalid 1' => [
-                'attempt' => fn() => $randInt1,
-                'validValues1' => $randInt1 + 1,
-                'validValues1Strict' => true,
-                'expectedAttempts' => 5,
-            ],
-            'successful attempt (strict) - invalid 2' => [
-                'attempt' => fn() => $randInt1,
-                'validValues1' => $randInt1 - 1,
-                'validValues1Strict' => true,
-                'validValues2' => $randInt1 + 1,
-                'validValues2Strict' => true,
-                'expectedAttempts' => 5,
-            ],
-
-            // strict 2
-            'successful attempt (strict 2) - valid 1' => [
-                'attempt' => fn() => $randInt1,
-                'validValues1' => (int) $randInt1,
-                'validValues1Strict' => true,
-                'expectedAttempts' => 1,
-            ],
-            'successful attempt (strict 2) - valid 2' => [
-                'attempt' => fn() => $randInt1,
-                'validValues1' => (bool) $randInt1,
-                'validValues1Strict' => true,
-                'validValues2' => (int) $randInt1,
-                'validValues2Strict' => true,
-                'expectedAttempts' => 1,
-            ],
-            'successful attempt (strict 2) - invalid 1' => [
-                'attempt' => fn() => $randInt1,
-                'validValues1' => (float) $randInt1,
-                'validValues1Strict' => true,
-                'expectedAttempts' => 5,
-            ],
-            'successful attempt (strict 2) - invalid 2' => [
-                'attempt' => fn() => $randInt1,
-                'validValues1' => (bool) $randInt1,
-                'validValues1Strict' => true,
-                'validValues2' => (float) $randInt1,
-                'validValues2Strict' => true,
-                'expectedAttempts' => 5,
-            ],
-
-            // callback
-            'successful attempt (callback) - valid 1' => [
-                'attempt' => fn() => $randInt1,
-                'validValues1' => fn($value) => true,
-                'expectedAttempts' => 1,
-            ],
-            'successful attempt (callback) - valid 2' => [
-                'attempt' => fn() => $randInt1,
-                'validValues1' => fn($value) => true,
-                'validValues1Strict' => true, // strictness doesn't matter for callbacks
-                'expectedAttempts' => 1,
-            ],
-            'successful attempt (callback) - invalid 1' => [
-                'attempt' => fn() => $randInt1,
-                'validValues1' => fn($value) => false,
-                'expectedAttempts' => 5,
-            ],
-            'successful attempt (callback) - invalid 2' => [
-                'attempt' => fn() => $randInt1,
-                'validValues1' => fn($value) => false,
-                'validValues1Strict' => true, // strictness doesn't matter for callbacks
-                'expectedAttempts' => 5,
-            ],
-        ];
-
-        foreach ($return as $index => $value) {
-            $return[$index] = array_merge($default, $value);
-        }
-
-        return $return;
-    }
-
-
-
-
-
     /**
      * Test what Backoff returns - including when exceptions occur and invalid results are returned, and when default
      * values are specified in different places (exception, return and attempt default values).
@@ -917,10 +33,11 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
      * @dataProvider backoffRethrowDataProvider
      *
      * @param callable       $attempt               The callback to attempt.
-     * @param boolean|null   $checkForExceptions    The exception to retry on (if present).
+     * @param boolean        $checkForExceptions    The exception to retry on (if present).
      * @param boolean        $useExceptionDefault   Whether to use an "exception" default value or not.
      * @param mixed          $exceptionDefault      The default "exception" value to use.
      * @param boolean        $checkForInvalidValues Whether to check for invalid return values or not.
+     * @param mixed          $retryWhenVal          Retry when the result is this.
      * @param boolean        $useReturnDefault      Whether to use a "return" default value or not.
      * @param mixed          $returnDefault         The default "return" value to use.
      * @param boolean        $useAttemptDefault     Whether to use an "attempt" default value or not.
@@ -933,13 +50,14 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
     #[DataProvider('backoffRethrowDataProvider')]
     public static function test_what_backoff_returns(
         callable $attempt,
-        ?bool $checkForExceptions,
-        ?bool $useExceptionDefault,
+        bool $checkForExceptions,
+        bool $useExceptionDefault,
         mixed $exceptionDefault,
         bool $checkForInvalidValues,
-        ?bool $useReturnDefault,
+        mixed $retryWhenVal,
+        bool $useReturnDefault,
         mixed $returnDefault,
-        ?bool $useAttemptDefault,
+        bool $useAttemptDefault,
         mixed $attemptDefault,
         mixed $expectedResult,
         ?Throwable $expectedException,
@@ -958,19 +76,17 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
         // use a default when an invalid return value is given on the last attempt
         if ($checkForInvalidValues) {
             $useReturnDefault
-                ? $backoff->retryWhen(false, false, $returnDefault)
-                : $backoff->retryWhen(false);
+                ? $backoff->retryWhen($retryWhenVal, true, $returnDefault)
+                : $backoff->retryWhen($retryWhenVal, true);
         }
 
         // use the backoff to attempt the callback
         $result = null;
         $caughtException = null;
         try {
-
             $result = $useAttemptDefault
                 ? $backoff->attempt($attempt, $attemptDefault)
                 : $backoff->attempt($attempt);
-
         } catch (Throwable $e) {
             $caughtException = $e;
         }
@@ -987,48 +103,54 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
      */
     public static function backoffRethrowDataProvider(): array
     {
+        $default = [
+            'attempt' => fn() => null,
+            'checkForExceptions' => false,
+            'useExceptionDefault' => false,
+            'exceptionDefault' => null,
+            'checkForInvalidValues' => false,
+            'retryWhenVal' => null,
+            'useReturnDefault' => false,
+            'returnDefault' => null,
+            'useAttemptDefault' => false,
+            'attemptDefault' => null,
+            'expectedResult' => null,
+            'expectedException' => null,
+        ];
+
+        $return = [];
         foreach (['bool', 'int', 'float', 'string', 'array', 'stdClass', 'callable'] as $type) {
 
             $successVal = self::generateRandomValueOfType($type);
-            $exceptionVal = self::generateRandomValueOfType($type);
-            $retryUntilVal = self::generateRandomValueOfType($type);
-            $attemptVal = self::generateRandomValueOfType($type);
+            $exceptionDefault = self::generateRandomValueOfType($type);
+            $returnDefault = self::generateRandomValueOfType($type);
+            $attemptDefault = self::generateRandomValueOfType($type);
 
-            $successReturn = $successVal; // when attempted callback returns a callable, it will be returned directly
-            $exceptionReturn = is_callable($exceptionVal)
-                ? $exceptionVal()
-                : $exceptionVal;
-            $retryUntilReturn = is_callable($retryUntilVal)
-                ? $retryUntilVal()
-                : $retryUntilVal;
-            $attemptReturn = is_callable($attemptVal)
-                ? $attemptVal()
-                : $attemptVal;
+            do {
+                $notSuccessVal = mt_rand();
+            } while ($notSuccessVal === $successVal);
+
+            $successValResolved = $successVal; // doesn't need resolving; will be returned directly, even when callable
+            $exceptionDefaultResolved = is_callable($exceptionDefault)
+                ? $exceptionDefault()
+                : $exceptionDefault;
+            $returnDefaultResolved = is_callable($returnDefault)
+                ? $returnDefault()
+                : $returnDefault;
+            $attemptDefaultResolved = is_callable($attemptDefault)
+                ? $attemptDefault()
+                : $attemptDefault;
 
             $backoffException = new BackoffException();
 
-            $default = [
-                'attempt' => fn() => null,
-                'checkForExceptions' => false,
-                'useExceptionDefault' => false,
-                'exceptionDefault' => null,
-                'checkForInvalidValues' => false,
-                'useReturnDefault' => false,
-                'returnDefault' => null,
-                'useAttemptDefault' => false,
-                'attemptDefault' => null,
-                'expectedResult' => null,
-                'expectedException' => null,
-            ];
-
-            $return = [
+            $nextReturn = [
 
                 // successful attempt
 
                 // successful attempt: 0
                 "successful attempt $type" => [
                     'attempt' => fn() => $successVal,
-                    'expectedResult' => $successReturn,
+                    'expectedResult' => $successValResolved,
                 ],
 
                 // successful attempt: 1
@@ -1036,36 +158,38 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                     'attempt' => fn() => $successVal,
                     'checkForExceptions' => true,
                     'useExceptionDefault' => false,
-                    'expectedResult' => $successReturn,
+                    'expectedResult' => $successValResolved,
                 ],
                 "successful attempt $type: (check for exp + exp default)" => [
                     'attempt' => fn() => $successVal,
                     'checkForExceptions' => true,
                     'useExceptionDefault' => true,
-                    'exceptionDefault' => $exceptionVal,
-                    'expectedResult' => $successReturn,
+                    'exceptionDefault' => $exceptionDefault,
+                    'expectedResult' => $successValResolved,
                 ],
 
                 // successful attempt: 2
                 "successful attempt $type: (check result)" => [
                     'attempt' => fn() => $successVal,
                     'checkForInvalidValues' => true,
-                    'expectedResult' => $successReturn,
+                    'retryWhenVal' => $notSuccessVal,
+                    'expectedResult' => $successValResolved,
                 ],
                 "successful attempt $type: (check result + \"return\" default)" => [
                     'attempt' => fn() => $successVal,
                     'checkForInvalidValues' => true,
+                    'retryWhenVal' => $notSuccessVal,
                     'useReturnDefault' => true,
-                    'returnDefault' => $retryUntilVal,
-                    'expectedResult' => $successReturn,
+                    'returnDefault' => $returnDefault,
+                    'expectedResult' => $successValResolved,
                 ],
 
                 // successful attempt: 3
                 "successful attempt $type: (\"attempt\" default)" => [
                     'attempt' => fn() => $successVal,
                     'useAttemptDefault' => true,
-                    'attemptDefault' => $attemptVal,
-                    'expectedResult' => $successReturn,
+                    'attemptDefault' => $attemptDefault,
+                    'expectedResult' => $successValResolved,
                 ],
 
                 // successful attempt: 1 + 2
@@ -1074,34 +198,38 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                     'checkForExceptions' => true,
                     'useExceptionDefault' => false,
                     'checkForInvalidValues' => true,
-                    'expectedResult' => $successReturn,
+                    'retryWhenVal' => $notSuccessVal,
+                    'expectedResult' => $successValResolved,
                 ],
                 "successful attempt $type: (check for exp + exp default) (check result)" => [
                     'attempt' => fn() => $successVal,
                     'checkForExceptions' => true,
                     'useExceptionDefault' => true,
-                    'exceptionDefault' => $exceptionVal,
+                    'exceptionDefault' => $exceptionDefault,
                     'checkForInvalidValues' => true,
-                    'expectedResult' => $successReturn,
+                    'retryWhenVal' => $notSuccessVal,
+                    'expectedResult' => $successValResolved,
                 ],
                 "successful attempt $type: (check for exp) (check result + \"return\" default)" => [
                     'attempt' => fn() => $successVal,
                     'checkForExceptions' => true,
                     'useExceptionDefault' => false,
                     'checkForInvalidValues' => true,
+                    'retryWhenVal' => $notSuccessVal,
                     'useReturnDefault' => true,
-                    'returnDefault' => $retryUntilVal,
-                    'expectedResult' => $successReturn,
+                    'returnDefault' => $returnDefault,
+                    'expectedResult' => $successValResolved,
                 ],
                 "successful attempt $type: (check for exp + exp default) (check result + \"return\" default)" => [
                     'attempt' => fn() => $successVal,
                     'checkForExceptions' => true,
                     'useExceptionDefault' => true,
-                    'exceptionDefault' => $exceptionVal,
+                    'exceptionDefault' => $exceptionDefault,
                     'checkForInvalidValues' => true,
+                    'retryWhenVal' => $notSuccessVal,
                     'useReturnDefault' => true,
-                    'returnDefault' => $retryUntilVal,
-                    'expectedResult' => $successReturn,
+                    'returnDefault' => $returnDefault,
+                    'expectedResult' => $successValResolved,
                 ],
 
                 // successful attempt: 1 + 3
@@ -1110,35 +238,37 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                     'checkForExceptions' => true,
                     'useExceptionDefault' => false,
                     'useAttemptDefault' => true,
-                    'attemptDefault' => $attemptVal,
-                    'expectedResult' => $successReturn,
+                    'attemptDefault' => $attemptDefault,
+                    'expectedResult' => $successValResolved,
                 ],
                 "successful attempt $type: (check for exp + exp default) (\"attempt\" default)" => [
                     'attempt' => fn() => $successVal,
                     'checkForExceptions' => true,
                     'useExceptionDefault' => true,
-                    'exceptionDefault' => $exceptionVal,
+                    'exceptionDefault' => $exceptionDefault,
                     'useAttemptDefault' => true,
-                    'attemptDefault' => $attemptVal,
-                    'expectedResult' => $successReturn,
+                    'attemptDefault' => $attemptDefault,
+                    'expectedResult' => $successValResolved,
                 ],
 
                 // successful attempt: 2 + 3
                 "successful attempt $type: (check result) (\"attempt\" default)" => [
                     'attempt' => fn() => $successVal,
                     'checkForInvalidValues' => true,
+                    'retryWhenVal' => $notSuccessVal,
                     'useAttemptDefault' => true,
-                    'attemptDefault' => $attemptVal,
-                    'expectedResult' => $successReturn,
+                    'attemptDefault' => $attemptDefault,
+                    'expectedResult' => $successValResolved,
                 ],
                 "successful attempt $type: (check result + \"return\" default) (\"attempt\" default)" => [
                     'attempt' => fn() => $successVal,
                     'checkForInvalidValues' => true,
+                    'retryWhenVal' => $notSuccessVal,
                     'useReturnDefault' => true,
-                    'returnDefault' => $retryUntilVal,
+                    'returnDefault' => $returnDefault,
                     'useAttemptDefault' => true,
-                    'attemptDefault' => $attemptVal,
-                    'expectedResult' => $successReturn,
+                    'attemptDefault' => $attemptDefault,
+                    'expectedResult' => $successValResolved,
                 ],
 
                 // successful attempt: 1 + 2 + 3
@@ -1147,19 +277,21 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                     'checkForExceptions' => true,
                     'useExceptionDefault' => false,
                     'checkForInvalidValues' => true,
+                    'retryWhenVal' => $notSuccessVal,
                     'useAttemptDefault' => true,
-                    'attemptDefault' => $attemptVal,
-                    'expectedResult' => $successReturn,
+                    'attemptDefault' => $attemptDefault,
+                    'expectedResult' => $successValResolved,
                 ],
                 "successful attempt $type: (check for exp + exp default) (check result) (\"attempt\" default)" => [
                     'attempt' => fn() => $successVal,
                     'checkForExceptions' => true,
                     'useExceptionDefault' => true,
-                    'exceptionDefault' => $exceptionVal,
+                    'exceptionDefault' => $exceptionDefault,
                     'checkForInvalidValues' => true,
+                    'retryWhenVal' => $notSuccessVal,
                     'useAttemptDefault' => true,
-                    'attemptDefault' => $attemptVal,
-                    'expectedResult' => $successReturn,
+                    'attemptDefault' => $attemptDefault,
+                    'expectedResult' => $successValResolved,
                 ],
                 "successful attempt $type: "
                 . "(check for exp) (check result + \"return\" default) (\"attempt\" default)" => [
@@ -1167,24 +299,26 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                     'checkForExceptions' => true,
                     'useExceptionDefault' => false,
                     'checkForInvalidValues' => true,
+                    'retryWhenVal' => $notSuccessVal,
                     'useReturnDefault' => true,
-                    'returnDefault' => $retryUntilVal,
+                    'returnDefault' => $returnDefault,
                     'useAttemptDefault' => true,
-                    'attemptDefault' => $attemptVal,
-                    'expectedResult' => $successReturn,
+                    'attemptDefault' => $attemptDefault,
+                    'expectedResult' => $successValResolved,
                 ],
                 "successful attempt $type: "
                 . "(check for exp + exp default) (chk result + \"return\" default) (\"attempt\" default)" => [
                     'attempt' => fn() => $successVal,
                     'checkForExceptions' => true,
                     'useExceptionDefault' => true,
-                    'exceptionDefault' => $exceptionVal,
+                    'exceptionDefault' => $exceptionDefault,
                     'checkForInvalidValues' => true,
+                    'retryWhenVal' => $notSuccessVal,
                     'useReturnDefault' => true,
-                    'returnDefault' => $retryUntilVal,
+                    'returnDefault' => $returnDefault,
                     'useAttemptDefault' => true,
-                    'attemptDefault' => $attemptVal,
-                    'expectedResult' => $successReturn,
+                    'attemptDefault' => $attemptDefault,
+                    'expectedResult' => $successValResolved,
                 ],
 
 
@@ -1208,21 +342,23 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                     'attempt' => fn() => throw $backoffException,
                     'checkForExceptions' => true,
                     'useExceptionDefault' => true,
-                    'exceptionDefault' => $exceptionVal,
-                    'expectedResult' => $exceptionReturn,
+                    'exceptionDefault' => $exceptionDefault,
+                    'expectedResult' => $exceptionDefaultResolved,
                 ],
 
                 // throws exception: 2
                 "throws exception $type: (check result)" => [
                     'attempt' => fn() => throw $backoffException,
                     'checkForInvalidValues' => true,
+                    'retryWhenVal' => $notSuccessVal,
                     'expectedException' => $backoffException,
                 ],
                 "throws exception $type: (check result + \"return\" default)" => [
                     'attempt' => fn() => throw $backoffException,
                     'checkForInvalidValues' => true,
+                    'retryWhenVal' => $notSuccessVal,
                     'useReturnDefault' => true,
-                    'returnDefault' => $retryUntilVal,
+                    'returnDefault' => $returnDefault,
                     'expectedException' => $backoffException,
                 ],
 
@@ -1230,8 +366,8 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 "throws exception $type: (\"attempt\" default)" => [
                     'attempt' => fn() => throw $backoffException,
                     'useAttemptDefault' => true,
-                    'attemptDefault' => $attemptVal,
-                    'expectedResult' => $attemptReturn,
+                    'attemptDefault' => $attemptDefault,
+                    'expectedResult' => $attemptDefaultResolved,
                 ],
 
                 // throws exception: 1 + 2
@@ -1240,34 +376,38 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                     'checkForExceptions' => true,
                     'useExceptionDefault' => false,
                     'checkForInvalidValues' => true,
+                    'retryWhenVal' => $notSuccessVal,
                     'expectedException' => $backoffException,
                 ],
                 "throws exception $type: (check for exp + exp default) (check result)" => [
                     'attempt' => fn() => throw $backoffException,
                     'checkForExceptions' => true,
                     'useExceptionDefault' => true,
-                    'exceptionDefault' => $exceptionVal,
+                    'exceptionDefault' => $exceptionDefault,
                     'checkForInvalidValues' => true,
-                    'expectedResult' => $exceptionReturn,
+                    'retryWhenVal' => $notSuccessVal,
+                    'expectedResult' => $exceptionDefaultResolved,
                 ],
                 "throws exception $type: (check for exp) (check result + \"return\" default)" => [
                     'attempt' => fn() => throw $backoffException,
                     'checkForExceptions' => true,
                     'useExceptionDefault' => false,
                     'checkForInvalidValues' => true,
+                    'retryWhenVal' => $notSuccessVal,
                     'useReturnDefault' => true,
-                    'returnDefault' => $retryUntilVal,
+                    'returnDefault' => $returnDefault,
                     'expectedException' => $backoffException,
                 ],
                 "throws exception $type: (check for exp + exp default) (check result + \"return\" default)" => [
                     'attempt' => fn() => throw $backoffException,
                     'checkForExceptions' => true,
                     'useExceptionDefault' => true,
-                    'exceptionDefault' => $exceptionVal,
+                    'exceptionDefault' => $exceptionDefault,
                     'checkForInvalidValues' => true,
+                    'retryWhenVal' => $notSuccessVal,
                     'useReturnDefault' => true,
-                    'returnDefault' => $retryUntilVal,
-                    'expectedResult' => $exceptionReturn,
+                    'returnDefault' => $returnDefault,
+                    'expectedResult' => $exceptionDefaultResolved,
                 ],
 
                 // throws exception: 1 + 3
@@ -1276,35 +416,37 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                     'checkForExceptions' => true,
                     'useExceptionDefault' => false,
                     'useAttemptDefault' => true,
-                    'attemptDefault' => $attemptVal,
-                    'expectedResult' => $attemptReturn,
+                    'attemptDefault' => $attemptDefault,
+                    'expectedResult' => $attemptDefaultResolved,
                 ],
                 "throws exception $type: (check for exp + exp default) (\"attempt\" default)" => [
                     'attempt' => fn() => throw $backoffException,
                     'checkForExceptions' => true,
                     'useExceptionDefault' => true,
-                    'exceptionDefault' => $exceptionVal,
+                    'exceptionDefault' => $exceptionDefault,
                     'useAttemptDefault' => true,
-                    'attemptDefault' => $attemptVal,
-                    'expectedResult' => $exceptionReturn,
+                    'attemptDefault' => $attemptDefault,
+                    'expectedResult' => $exceptionDefaultResolved,
                 ],
 
                 // throws exception: 2 + 3
                 "throws exception $type: (check result) (\"attempt\" default)" => [
                     'attempt' => fn() => throw $backoffException,
                     'checkForInvalidValues' => true,
+                    'retryWhenVal' => $notSuccessVal,
                     'useAttemptDefault' => true,
-                    'attemptDefault' => $attemptVal,
-                    'expectedResult' => $attemptReturn,
+                    'attemptDefault' => $attemptDefault,
+                    'expectedResult' => $attemptDefaultResolved,
                 ],
                 "throws exception $type: (check result + \"return\" default) (\"attempt\" default)" => [
                     'attempt' => fn() => throw $backoffException,
                     'checkForInvalidValues' => true,
+                    'retryWhenVal' => $notSuccessVal,
                     'useReturnDefault' => true,
-                    'returnDefault' => $retryUntilVal,
+                    'returnDefault' => $returnDefault,
                     'useAttemptDefault' => true,
-                    'attemptDefault' => $attemptVal,
-                    'expectedResult' => $attemptReturn,
+                    'attemptDefault' => $attemptDefault,
+                    'expectedResult' => $attemptDefaultResolved,
                 ],
 
                 // throws exception: 1 + 2 + 3
@@ -1313,43 +455,47 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                     'checkForExceptions' => true,
                     'useExceptionDefault' => false,
                     'checkForInvalidValues' => true,
+                    'retryWhenVal' => $notSuccessVal,
                     'useAttemptDefault' => true,
-                    'attemptDefault' => $attemptVal,
-                    'expectedResult' => $attemptReturn,
+                    'attemptDefault' => $attemptDefault,
+                    'expectedResult' => $attemptDefaultResolved,
                 ],
                 "throws exception $type: (check for exp + exp default) (check result) (\"attempt\" default)" => [
                     'attempt' => fn() => throw $backoffException,
                     'checkForExceptions' => true,
                     'useExceptionDefault' => true,
-                    'exceptionDefault' => $exceptionVal,
+                    'exceptionDefault' => $exceptionDefault,
                     'checkForInvalidValues' => true,
+                    'retryWhenVal' => $notSuccessVal,
                     'useAttemptDefault' => true,
-                    'attemptDefault' => $attemptVal,
-                    'expectedResult' => $exceptionReturn,
+                    'attemptDefault' => $attemptDefault,
+                    'expectedResult' => $exceptionDefaultResolved,
                 ],
                 "throws exception $type: (check for exp) (check result + \"return\" default) (\"attempt\" default)" => [
                     'attempt' => fn() => throw $backoffException,
                     'checkForExceptions' => true,
                     'useExceptionDefault' => false,
                     'checkForInvalidValues' => true,
+                    'retryWhenVal' => $notSuccessVal,
                     'useReturnDefault' => true,
-                    'returnDefault' => $retryUntilVal,
+                    'returnDefault' => $returnDefault,
                     'useAttemptDefault' => true,
-                    'attemptDefault' => $attemptVal,
-                    'expectedResult' => $attemptReturn,
+                    'attemptDefault' => $attemptDefault,
+                    'expectedResult' => $attemptDefaultResolved,
                 ],
                 "throws exception $type: "
                 . "(check for exp + exp default) (check result + \"return\" default) (\"attempt\" default)" => [
                     'attempt' => fn() => throw $backoffException,
                     'checkForExceptions' => true,
                     'useExceptionDefault' => true,
-                    'exceptionDefault' => $exceptionVal,
+                    'exceptionDefault' => $exceptionDefault,
                     'checkForInvalidValues' => true,
+                    'retryWhenVal' => $notSuccessVal,
                     'useReturnDefault' => true,
-                    'returnDefault' => $retryUntilVal,
+                    'returnDefault' => $returnDefault,
                     'useAttemptDefault' => true,
-                    'attemptDefault' => $attemptVal,
-                    'expectedResult' => $exceptionReturn,
+                    'attemptDefault' => $attemptDefault,
+                    'expectedResult' => $exceptionDefaultResolved,
                 ],
 
 
@@ -1373,7 +519,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
 //                    'attempt' => fn() => false,
 //                    'checkForExceptions' => true,
 //                    'useExceptionDefault' => true,
-//                    'exceptionDefault' => $exceptionVal,
+//                    'exceptionDefault' => $exceptionDefault,
 //                    'expectedResult' => false, // <<< the value isn't deemed invalid because it's not checked for
 //                ],
 
@@ -1381,21 +527,23 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 "invalid result $type: (check result)" => [
                     'attempt' => fn() => false,
                     'checkForInvalidValues' => true,
+                    'retryWhenVal' => false,
                     'expectedResult' => false, // <<< the invalid result is returned at the end
                 ],
                 "invalid result $type: (check result + \"return\" default)" => [
                     'attempt' => fn() => false,
                     'checkForInvalidValues' => true,
+                    'retryWhenVal' => false,
                     'useReturnDefault' => true,
-                    'returnDefault' => $retryUntilVal,
-                    'expectedResult' => $retryUntilReturn,
+                    'returnDefault' => $returnDefault,
+                    'expectedResult' => $returnDefaultResolved,
                 ],
 
                 // invalid result: 3
 //                "invalid result $type: (\"attempt\" default)" => [
 //                    'attempt' => fn() => false,
 //                    'useAttemptDefault' => true,
-//                    'attemptDefault' => $attemptVal,
+//                    'attemptDefault' => $attemptDefault,
 //                    'expectedResult' => false, // <<< the value isn't deemed invalid because it's not checked for
 //                ],
 
@@ -1405,14 +553,16 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                     'checkForExceptions' => true,
                     'useExceptionDefault' => false,
                     'checkForInvalidValues' => true,
+                    'retryWhenVal' => false,
                     'expectedResult' => false, // <<< the invalid result is returned at the end
                 ],
                 "invalid result $type: (check for exp + exp default) (check result)" => [
                     'attempt' => fn() => false,
                     'checkForExceptions' => true,
                     'useExceptionDefault' => true,
-                    'exceptionDefault' => $exceptionVal,
+                    'exceptionDefault' => $exceptionDefault,
                     'checkForInvalidValues' => true,
+                    'retryWhenVal' => false,
                     'expectedResult' => false, // <<< the invalid result is returned at the end
                 ],
                 "invalid result $type: (check for exp) (check result + \"return\" default)" => [
@@ -1420,19 +570,21 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                     'checkForExceptions' => true,
                     'useExceptionDefault' => false,
                     'checkForInvalidValues' => true,
+                    'retryWhenVal' => false,
                     'useReturnDefault' => true,
-                    'returnDefault' => $retryUntilVal,
-                    'expectedResult' => $retryUntilReturn,
+                    'returnDefault' => $returnDefault,
+                    'expectedResult' => $returnDefaultResolved,
                 ],
                 "invalid result $type: (check for exp + exp default) (check result + \"return\" default)" => [
                     'attempt' => fn() => false,
                     'checkForExceptions' => true,
                     'useExceptionDefault' => true,
-                    'exceptionDefault' => $exceptionVal,
+                    'exceptionDefault' => $exceptionDefault,
                     'checkForInvalidValues' => true,
+                    'retryWhenVal' => false,
                     'useReturnDefault' => true,
-                    'returnDefault' => $retryUntilVal,
-                    'expectedResult' => $retryUntilReturn,
+                    'returnDefault' => $returnDefault,
+                    'expectedResult' => $returnDefaultResolved,
                 ],
 
                 // invalid result: 1 + 3
@@ -1441,16 +593,16 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
 //                    'checkForExceptions' => true,
 //                    'useExceptionDefault' => false,
 //                    'useAttemptDefault' => true,
-//                    'attemptDefault' => $attemptVal,
+//                    'attemptDefault' => $attemptDefault,
 //                    'expectedResult' => false, // <<< the value isn't deemed invalid because it's not checked for
 //                ],
 //                "invalid result $type: (check for exp + exp default) (\"attempt\" default)" => [
 //                    'attempt' => fn() => false,
 //                    'checkForExceptions' => true,
 //                    'useExceptionDefault' => true,
-//                    'exceptionDefault' => $exceptionVal,
+//                    'exceptionDefault' => $exceptionDefault,
 //                    'useAttemptDefault' => true,
-//                    'attemptDefault' => $attemptVal,
+//                    'attemptDefault' => $attemptDefault,
 //                    'expectedResult' => false, // <<< the value isn't deemed invalid because it's not checked for
 //                ],
 
@@ -1458,18 +610,20 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 "invalid result $type: (check result) (\"attempt\" default)" => [
                     'attempt' => fn() => false,
                     'checkForInvalidValues' => true,
+                    'retryWhenVal' => false,
                     'useAttemptDefault' => true,
-                    'attemptDefault' => $attemptVal,
-                    'expectedResult' => $attemptReturn,
+                    'attemptDefault' => $attemptDefault,
+                    'expectedResult' => $attemptDefaultResolved,
                 ],
                 "invalid result $type: (check result + \"return\" default) (\"attempt\" default)" => [
                     'attempt' => fn() => false,
                     'checkForInvalidValues' => true,
+                    'retryWhenVal' => false,
                     'useReturnDefault' => true,
-                    'returnDefault' => $retryUntilVal,
+                    'returnDefault' => $returnDefault,
                     'useAttemptDefault' => true,
-                    'attemptDefault' => $attemptVal,
-                    'expectedResult' => $retryUntilReturn,
+                    'attemptDefault' => $attemptDefault,
+                    'expectedResult' => $returnDefaultResolved,
                 ],
 
                 // invalid result: 1 + 2 + 3
@@ -1478,45 +632,51 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                     'checkForExceptions' => true,
                     'useExceptionDefault' => false,
                     'checkForInvalidValues' => true,
+                    'retryWhenVal' => false,
                     'useAttemptDefault' => true,
-                    'attemptDefault' => $attemptVal,
-                    'expectedResult' => $attemptReturn,
+                    'attemptDefault' => $attemptDefault,
+                    'expectedResult' => $attemptDefaultResolved,
                 ],
                 "invalid result $type: (check for exp + exp default) (check result) (\"attempt\" default)" => [
                     'attempt' => fn() => false,
                     'checkForExceptions' => true,
                     'useExceptionDefault' => true,
-                    'exceptionDefault' => $exceptionVal,
+                    'exceptionDefault' => $exceptionDefault,
                     'checkForInvalidValues' => true,
+                    'retryWhenVal' => false,
                     'useAttemptDefault' => true,
-                    'attemptDefault' => $attemptVal,
-                    'expectedResult' => $attemptReturn,
+                    'attemptDefault' => $attemptDefault,
+                    'expectedResult' => $attemptDefaultResolved,
                 ],
                 "invalid result $type: (check for exp) (check result + \"return\" default) (\"attempt\" default)" => [
                     'attempt' => fn() => false,
                     'checkForExceptions' => true,
                     'useExceptionDefault' => false,
                     'checkForInvalidValues' => true,
+                    'retryWhenVal' => false,
                     'useReturnDefault' => true,
-                    'returnDefault' => $retryUntilVal,
+                    'returnDefault' => $returnDefault,
                     'useAttemptDefault' => true,
-                    'attemptDefault' => $attemptVal,
-                    'expectedResult' => $retryUntilReturn,
+                    'attemptDefault' => $attemptDefault,
+                    'expectedResult' => $returnDefaultResolved,
                 ],
                 "invalid result $type: "
                 . "(check for exp + exp default) (check result + \"return\" default) (\"attempt\" default)" => [
                     'attempt' => fn() => false,
                     'checkForExceptions' => true,
                     'useExceptionDefault' => true,
-                    'exceptionDefault' => $exceptionVal,
+                    'exceptionDefault' => $exceptionDefault,
                     'checkForInvalidValues' => true,
+                    'retryWhenVal' => false,
                     'useReturnDefault' => true,
-                    'returnDefault' => $retryUntilVal,
+                    'returnDefault' => $returnDefault,
                     'useAttemptDefault' => true,
-                    'attemptDefault' => $attemptVal,
-                    'expectedResult' => $retryUntilReturn,
+                    'attemptDefault' => $attemptDefault,
+                    'expectedResult' => $returnDefaultResolved,
                 ],
             ];
+
+            $return = array_merge($return, $nextReturn);
         }
 
         foreach ($return as $index => $value) {
@@ -1546,1064 +706,6 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
             'stdClass' => (object) ['prop' => mt_rand()],
             'callable' => fn() => $callableRand,
         };
-    }
-
-
-
-
-
-    /**
-     * Test that exceptions thrown by callbacks passed to ->retryExceptions(), are thrown.
-     *
-     * @test
-     *
-     * @return void
-     */
-    #[Test]
-    public static function test_that_retry_exceptions_exceptions_are_thrown(): void
-    {
-        $exception2 = new Exception('exception 2');
-        $count = 0;
-        $callback = function (Throwable $e, AttemptLog $log) use (&$count, $exception2): bool {
-            $count++;
-            throw $exception2;
-        };
-
-        $e = null;
-        try {
-            Backoff::noop()
-                ->maxAttempts(2)
-                ->retryExceptions($callback)
-                ->attempt(fn() => throw new Exception('exception 1'));
-        } catch (Throwable $e) {
-        }
-
-        self::assertSame(1, $count);
-        self::assertSame($exception2, $e);
-    }
-
-
-
-
-
-    /**
-     * Test the retryAllExceptions() method.
-     *
-     * @test
-     *
-     * @return void
-     */
-    #[Test]
-    public static function test_retry_all_exceptions(): void
-    {
-        $randInt = mt_rand();
-
-        $count = 0;
-        $exception = new Exception();
-        $callback = function () use (&$count, $exception) {
-            $count++;
-
-            throw $exception;
-        };
-
-
-
-        // pass a default
-        $result = Backoff::noop()
-            ->maxAttempts(2)
-            ->retryExceptions(OtherExcptn1::class) // start with this
-            ->retryAllExceptions($randInt) // but reset to this
-            ->attempt(fn() => throw new Exception());
-
-        self::assertSame($randInt, $result);
-
-
-
-        // pass no default
-        $count = 0;
-        $e = null;
-        try {
-            Backoff::noop()
-                ->maxAttempts(2)
-                ->retryExceptions(OtherExcptn1::class) // start with this
-                ->retryAllExceptions() // but reset to this
-                ->attempt($callback);
-        } catch (Throwable $e) {
-        }
-
-        self::assertSame(2, $count);
-        self::assertSame($exception, $e);
-
-
-
-        // pass no default
-        $count = 0;
-        $e = null;
-        try {
-            Backoff::noop()
-                ->maxAttempts(2)
-                ->retryExceptions(Exception::class, 'default') // start with this
-                ->retryAllExceptions() // but reset to this
-                ->attempt($callback);
-        } catch (Throwable $e) {
-        }
-
-        self::assertSame(2, $count);
-        self::assertSame($exception, $e);
-    }
-
-    /**
-     * Test that exceptions are not retried when ->dontRetryExceptions() is called.
-     *
-     * @test
-     *
-     * @return void
-     */
-    #[Test]
-    public static function test_that_dont_retry_exceptions_disables_retries(): void
-    {
-        $newBackoff = fn() => Backoff::noop()->maxAttempts(5)->retryExceptions();
-
-        $createCallback = fn(&$count) => function (Throwable $e, AttemptLog $log, bool $willRetry) use (&$count) {
-            $count++;
-        };
-
-        // noop - WILL retry exceptions - will call the callback more than once
-        $count = 0;
-        $newBackoff()
-            ->exceptionCallback($createCallback($count))
-            ->attempt(fn() => throw new Exception(), null);
-        self::assertSame(5, $count); // <<<
-
-        // noop - will NOT retry exceptions - will call the callback once
-        $count = 0;
-        $newBackoff()
-            ->dontRetryExceptions()
-            ->exceptionCallback($createCallback($count))
-            ->attempt(fn() => throw new Exception(), null);
-        self::assertSame(1, $count); // <<<
-    }
-
-    /**
-     * Test that when exceptions are not retried, a default value can be used.
-     *
-     * @test
-     *
-     * @return void
-     */
-    #[Test]
-    public static function test_that_dont_retry_exceptions_can_have_a_default(): void
-    {
-        $newBackoff = fn() => Backoff::noop()->maxAttempts(5)->retryExceptions();
-
-        // with no default passed
-        $caughtException = false;
-        try {
-            $newBackoff()
-                ->dontRetryExceptions() // <<< no default
-                ->attempt(fn() => throw new Exception());
-        } catch (Throwable $e) {
-            $caughtException = true;
-        }
-        self::assertTrue($caughtException);
-
-        // with default passed
-        $default = mt_rand();
-        $return = $newBackoff()
-            ->dontRetryExceptions($default) // <<< default
-            ->attempt(fn() => throw new Exception());
-        self::assertSame($default, $return);
-    }
-
-    /**
-     * Test that all exceptions are checked for and a default is returned when retryExceptions is called with only
-     * default specified.
-     *
-     * @test
-     *
-     * @return void
-     */
-    #[Test]
-    public static function test_that_exceptions_are_retried_when_only_a_default_is_passed(): void
-    {
-        $randInt = mt_rand();
-
-        $result = Backoff::noop()
-            ->maxAttempts(2)
-            ->retryExceptions(OtherExcptn1::class) // start with this
-            ->retryExceptions(default: $randInt) // but reset to this
-            ->attempt(fn() => throw new Exception());
-
-        self::assertSame($randInt, $result);
-    }
-
-
-
-
-
-    /**
-     * Test that different combinations of exceptionCallbacks are called.
-     *
-     * @test
-     *
-     * @return void
-     */
-    #[Test]
-    public static function test_that_every_exception_callback_is_called(): void
-    {
-        $maxAttempts = 5;
-        $newBackoff = fn() => Backoff::noop()->maxAttempts($maxAttempts)->retryExceptions();
-
-        $exception = new Exception();
-        $createCallback = fn(&$count)
-            => function (Throwable $e, AttemptLog $log, bool $willRetry) use (&$count) {
-                $count++;
-            };
-
-
-
-        $count1 = 0;
-        $newBackoff()
-            ->exceptionCallback($createCallback($count1))
-            ->attempt(fn() => throw $exception, null);
-        self::assertSame($maxAttempts, $count1);
-
-        $count1 = $count2 = 0;
-        $newBackoff()
-            ->exceptionCallback($createCallback($count1), $createCallback($count2))
-            ->attempt(fn() => throw $exception, null);
-        self::assertSame($maxAttempts, $count1);
-        self::assertSame($maxAttempts, $count2);
-
-
-        $count1 = $count2 = $count3 = 0;
-        $newBackoff()
-            ->exceptionCallback($createCallback($count1), [$createCallback($count2), $createCallback($count3)])
-            ->attempt(fn() => throw $exception, null);
-        self::assertSame($maxAttempts, $count1);
-        self::assertSame($maxAttempts, $count2);
-        self::assertSame($maxAttempts, $count3);
-
-
-        $count1 = $count2 = $count3 = $count4 = 0;
-        $newBackoff()
-            ->exceptionCallback($createCallback($count1))
-            ->exceptionCallback([$createCallback($count2), $createCallback($count3), $createCallback($count4)])
-            ->attempt(fn() => throw $exception, null);
-        self::assertSame($maxAttempts, $count1);
-        self::assertSame($maxAttempts, $count2);
-        self::assertSame($maxAttempts, $count3);
-        self::assertSame($maxAttempts, $count4);
-
-
-        $count1 = $count2 = $count3 = 0;
-        $newBackoff()
-            ->exceptionCallback($createCallback($count1))
-            ->exceptionCallback($createCallback($count2))
-            ->exceptionCallback($createCallback($count3))
-            ->attempt(fn() => throw $exception, null);
-        self::assertSame($maxAttempts, $count1);
-        self::assertSame($maxAttempts, $count2);
-        self::assertSame($maxAttempts, $count3);
-
-
-        // a callable array
-        $invokableClass = new InvokableClass();
-        $callable = [$invokableClass, '__invoke'];
-
-        $count1 = $count2 = 0;
-        $newBackoff()
-            ->exceptionCallback($callable)
-            ->attempt(fn() => throw $exception, null);
-        self::assertSame($maxAttempts, $invokableClass->getCount());
-    }
-
-    /**
-     * Test which exception is passed to exception callbacks.
-     *
-     * @test
-     *
-     * @return void
-     */
-    #[Test]
-    public static function test_which_exception_is_passed_to_exception_callbacks(): void
-    {
-        $newBackoff = fn() => Backoff::noop()->maxAttempts(2)->retryExceptions();
-
-        $exception = new Exception();
-        $createCallback = fn(&$count)
-            => function (Throwable $e, AttemptLog $log, bool $willRetry) use (&$count, $exception) {
-                $count++;
-                self::assertSame($exception, $e); // <<<
-            };
-
-        $count = 0;
-        $newBackoff()
-            ->exceptionCallback($createCallback($count))
-            ->attempt(fn() => throw $exception, null);
-        self::assertGreaterThan(0, $count); // just confirm that it happened
-    }
-
-    /**
-     * Test that $willRetry that's passed to exception callbacks is passed correctly.
-     *
-     * @test
-     *
-     * @return void
-     */
-    #[Test]
-    public static function test_will_retry_is_passed_to_exception_callbacks_correctly(): void
-    {
-        $maxAttempts = mt_rand(0, 10);
-        $newNoopBackoff = fn() => Backoff::noop()->maxAttempts($maxAttempts)->retryExceptions();
-        $newSequenceBackoff = fn() => Backoff::sequenceUs([1, 2, 3])->maxAttempts($maxAttempts)->retryExceptions();
-
-        $exception = new Exception();
-        $createCallback = fn(&$count, $expectedWillRetry, $actualMaxAttempts)
-            => function (
-                Throwable $e,
-                AttemptLog $log,
-                bool $willRetry
-            ) use (
-                &$count,
-                $expectedWillRetry,
-                $actualMaxAttempts,
-            ) {
-                $count++;
-                $expectedWillRetry = ($count < $actualMaxAttempts)
-                    ? $expectedWillRetry
-                    : false;
-
-                self::assertSame($expectedWillRetry, $willRetry); // <<<
-            };
-
-        // noop - WILL retry exceptions
-        $count1 = 0;
-        $newNoopBackoff()
-            ->exceptionCallback($createCallback($count1, true, $maxAttempts))
-            ->attempt(fn() => throw $exception, null);
-
-        // noop - will NOT retry exceptions
-        $count1 = 0;
-        $newNoopBackoff()
-            ->dontRetryExceptions()
-            ->exceptionCallback($createCallback($count1, false, 1))
-            ->attempt(fn() => throw $exception, null);
-
-        // sequence (with 3 retries) - WILL retry exceptions
-        $count1 = 0;
-        $newSequenceBackoff()
-            ->maxAttempts(6) // more than the number of delays in the sequence
-            ->exceptionCallback($createCallback($count1, true, 4))
-            ->attempt(fn() => throw $exception, null);
-
-        // sequence (with 3 retries) - will NOT retry exceptions
-        $count1 = 0;
-        $newSequenceBackoff()
-            ->dontRetryExceptions() // more than the number of delays in the sequence
-            ->exceptionCallback($createCallback($count1, false, 1))
-            ->attempt(fn() => throw $exception, null);
-    }
-
-    /**
-     * Test that when an exception callback itself throws an exception, that this exception is rethrown.
-     *
-     * @test
-     *
-     * @return void
-     */
-    #[Test]
-    public static function test_that_exception_callback_exceptions_are_rethrown(): void
-    {
-        $count = 0;
-        $randInt = mt_rand();
-        $callback = function () use (&$count, $randInt) {
-            $count++;
-            throw new Exception("thrown from here $randInt");
-        };
-
-        $e = null;
-        try {
-            Backoff::noop()
-                ->maxAttempts(5)
-                ->exceptionCallback($callback)
-                ->retryExceptions()
-                ->attempt(fn() => throw new Exception(), null);
-        } catch (Throwable $e) {
-        }
-
-        self::assertInstanceOf(Exception::class, $e);
-        self::assertSame("thrown from here $randInt", $e->getMessage());
-        self::assertSame(1, $count);
-    }
-
-
-
-
-
-    /**
-     * Test which values are passed to invalid-result callbacks.
-     *
-     * @test
-     *
-     * @return void
-     */
-    #[Test]
-    public static function test_that_invalid_value_callbacks_are_called(): void
-    {
-        $maxAttempts = 2;
-        $newBackoff = fn() => Backoff::noop()->maxAttempts($maxAttempts)->retryExceptions();
-        $createCallback = fn(&$count) => function () use (&$count) {
-            $count++;
-        };
-
-
-
-        $count1 = 0;
-        $newBackoff()
-            ->retryWhen(10)
-            ->invalidResultCallback($createCallback($count1))
-            ->attempt(fn() => 10, null);
-        self::assertSame($maxAttempts, $count1);
-
-        $count1 = $count2 = 0;
-        $newBackoff()
-            ->retryWhen(10)
-            ->invalidResultCallback($createCallback($count1), $createCallback($count2))
-            ->attempt(fn() => 10, null);
-        self::assertSame($maxAttempts, $count1);
-        self::assertSame($maxAttempts, $count2);
-
-
-        $count1 = $count2 = $count3 = 0;
-        $newBackoff()
-            ->retryWhen(10)
-            ->invalidResultCallback($createCallback($count1), [$createCallback($count2), $createCallback($count3)])
-            ->attempt(fn() => 10, null);
-        self::assertSame($maxAttempts, $count1);
-        self::assertSame($maxAttempts, $count2);
-        self::assertSame($maxAttempts, $count3);
-
-
-        $count1 = $count2 = $count3 = $count4 = 0;
-        $newBackoff()
-            ->retryWhen(10)
-            ->invalidResultCallback($createCallback($count1))
-            ->invalidResultCallback([$createCallback($count2), $createCallback($count3), $createCallback($count4)])
-            ->attempt(fn() => 10, null);
-        self::assertSame($maxAttempts, $count1);
-        self::assertSame($maxAttempts, $count2);
-        self::assertSame($maxAttempts, $count3);
-        self::assertSame($maxAttempts, $count4);
-
-
-        $count1 = $count2 = $count3 = 0;
-        $newBackoff()
-            ->retryWhen(10)
-            ->invalidResultCallback($createCallback($count1))
-            ->invalidResultCallback($createCallback($count2))
-            ->invalidResultCallback($createCallback($count3))
-            ->attempt(fn() => 10, null);
-        self::assertSame($maxAttempts, $count1);
-        self::assertSame($maxAttempts, $count2);
-        self::assertSame($maxAttempts, $count3);
-
-
-        // a callable array
-        $invokableClass = new InvokableClass();
-        $callable = [$invokableClass, '__invoke'];
-
-        $count1 = $count2 = 0;
-        $newBackoff()
-            ->retryWhen(10)
-            ->invalidResultCallback($callable)
-            ->attempt(fn() => 10, null);
-        self::assertSame($maxAttempts, $invokableClass->getCount());
-
-
-        // triggered via ->retryUntil()
-        $count1 = $count2 = $count3 = 0;
-        $newBackoff()
-            ->retryUntil(11)
-            ->invalidResultCallback($createCallback($count1))
-            ->invalidResultCallback($createCallback($count2))
-            ->invalidResultCallback($createCallback($count3))
-            ->attempt(fn() => 10, null);
-        self::assertSame($maxAttempts, $count1);
-        self::assertSame($maxAttempts, $count2);
-        self::assertSame($maxAttempts, $count3);
-    }
-
-    /**
-     * Test that exceptions thrown by callbacks passed to ->invalidResultCallback(), are thrown.
-     *
-     * @test
-     *
-     * @return void
-     */
-    #[Test]
-    public static function test_that_invalid_value_callback_exceptions_are_thrown(): void
-    {
-        $exception = new Exception();
-        $count = 0;
-        $callback = function (mixed $result, AttemptLog $log) use (&$count, $exception): bool {
-            $count++;
-            throw $exception;
-        };
-
-        $e = null;
-        try {
-            Backoff::noop()
-                ->maxAttempts(2)
-                ->retryWhen(10)
-                ->invalidResultCallback($callback)
-                ->attempt(fn() => 10, null);
-        } catch (Throwable $e) {
-        }
-
-        self::assertSame(1, $count);
-        self::assertSame($exception, $e);
-    }
-
-
-
-
-
-    /**
-     * Test that ->retryWhen() and ->retryUntil() cancel each other out.
-     *
-     * @test
-     *
-     * @return void
-     */
-    #[Test]
-    public static function test_that_retry_when_and_retry_until_reset_the_other(): void
-    {
-        $count = 0;
-        $callback = function () use (&$count) {
-            $count++;
-            return 10;
-        };
-
-        $backoff = Backoff::noop()->maxAttempts(5)->retryExceptions();
-        $backoff->retryWhen(10);
-        $backoff->retryUntil(10);
-
-        $count = 0;
-        $backoff->attempt($callback);
-
-        self::assertSame(1, $count);
-
-
-
-        $backoff = Backoff::noop()->maxAttempts(5)->retryExceptions();
-        $backoff->retryUntil(10);
-        $backoff->retryWhen(10);
-
-        $count = 0;
-        $backoff->attempt($callback);
-
-        self::assertSame(5, $count);
-    }
-
-
-
-
-
-    /**
-     * Test that different combinations of successCallbacks are called.
-     *
-     * @test
-     *
-     * @return void
-     */
-    #[Test]
-    public static function test_that_every_success_callback_is_called()
-    {
-        $maxAttempts = 5;
-        $newBackoff = fn() => Backoff::noop()->maxAttempts($maxAttempts)->retryExceptions();
-
-        $createCallback = fn(&$count)
-            /** @var AttemptLog[] $logs */
-            => function (array $logs) use (&$count) {
-                $count++;
-            };
-
-
-
-        // one callback
-        $count1 = 0;
-        $newBackoff()
-            ->successCallback($createCallback($count1))
-            ->attempt(fn() => true, null);
-        self::assertSame(1, $count1);
-
-        // two callbacks, separate params
-        $count1 = $count2 = 0;
-        $newBackoff()
-            ->successCallback($createCallback($count1), $createCallback($count2))
-            ->attempt(fn() => true, null);
-        self::assertSame(1, $count1);
-        self::assertSame(1, $count2);
-
-        // three callbacks, separate params, two in an array
-        $count1 = $count2 = $count3 = 0;
-        $newBackoff()
-            ->successCallback($createCallback($count1), [$createCallback($count2), $createCallback($count3)])
-            ->attempt(fn() => true, null);
-        self::assertSame(1, $count1);
-        self::assertSame(1, $count2);
-        self::assertSame(1, $count3);
-
-        // four callbacks, two calls, including an array
-        $count1 = $count2 = $count3 = $count4 = 0;
-        $newBackoff()
-            ->successCallback($createCallback($count1))
-            ->successCallback([$createCallback($count2), $createCallback($count3), $createCallback($count4)])
-            ->attempt(fn() => true, null);
-        self::assertSame(1, $count1);
-        self::assertSame(1, $count2);
-        self::assertSame(1, $count3);
-        self::assertSame(1, $count4);
-
-        // three callbacks, separate calls
-        $count1 = $count2 = $count3 = 0;
-        $newBackoff()
-            ->successCallback($createCallback($count1))
-            ->successCallback($createCallback($count2))
-            ->successCallback($createCallback($count3))
-            ->attempt(fn() => true, null);
-        self::assertSame(1, $count1);
-        self::assertSame(1, $count2);
-        self::assertSame(1, $count3);
-
-        // one callback as a callable array
-        $invokableClass = new InvokableClass();
-        $callable = [$invokableClass, '__invoke'];
-
-        $newBackoff()
-            ->successCallback($callable)
-            ->attempt(fn() => true, null);
-        self::assertSame(1, $invokableClass->getCount());
-    }
-
-    /**
-     * Test that the success callback is called only once when expected, even if exceptions or invalid values have
-     * caused multiple retries.
-     *
-     * @test
-     *
-     * @return void
-     */
-    #[Test]
-    public static function test_that_success_callbacks_are_called_only_once_when_expected(): void
-    {
-        $createCallback = fn(&$count)
-            /** @var AttemptLog[] $logs */
-            => function (array $logs) use (&$count) {
-                $count++;
-            };
-
-        // generate a callback that throws a callback until it's been called a certain number of times
-        $succeedAfterXCallback = function ($count) {
-            $current = 0;
-            return function () use (&$current, $count) {
-                $current++;
-                if ($current < $count) {
-                    throw new Exception();
-                }
-            };
-        };
-
-        foreach ([0, 1, 5] as $maxAttempts) {
-            foreach ([1, 2, 4, 5, 6] as $succeedAfter) {
-
-                $count1 = 0;
-                Backoff::noop()
-                    ->retryExceptions()
-                    ->maxAttempts($maxAttempts)
-                    ->successCallback($createCallback($count1))
-                    ->attempt($succeedAfterXCallback($succeedAfter), null);
-
-                $expectedCount = ($maxAttempts > 0) && ($succeedAfter <= $maxAttempts) ? 1 : 0;
-                self::assertSame($expectedCount, $count1); // <<<
-            }
-        }
-    }
-
-    /**
-     * Test that the array of AttemptLogs are passed to success callbacks.
-     *
-     * @test
-     *
-     * @return void
-     */
-    #[Test]
-    public static function test_that_attempt_logs_are_passed_to_success_callbacks(): void
-    {
-        // generate a callback that throws a callback until it's been called a certain number of times
-        $succeedAfterXCallback = function ($count) {
-            $current = 0;
-            return function () use (&$current, $count) {
-                $current++;
-                if ($current < $count) {
-                    throw new Exception();
-                }
-            };
-        };
-
-        foreach ([1, 2, 3, 4] as $succeedAfter) {
-
-            $passedLogs = null;
-            $callback = function (array $logs) use (&$passedLogs) {
-                /** @var AttemptLog[] $logs */
-                $passedLogs = $logs;
-            };
-
-            $backoff = Backoff::noop()
-                ->maxAttempts(10)
-                ->retryExceptions()
-                ->successCallback($callback);
-            $backoff->attempt($succeedAfterXCallback($succeedAfter), null);
-
-            self::assertSame($backoff->logs(), $passedLogs);
-        }
-    }
-
-
-
-
-
-    /**
-     * Test that different combinations of failureCallbacks are called.
-     *
-     * Also tests that fallbackCallback() is an alias for failureCallback().
-     *
-     * @test
-     *
-     * @return void
-     */
-    #[Test]
-    public static function test_that_every_failure_callback_is_called()
-    {
-        $maxAttempts = 5;
-        $newBackoff = fn() => Backoff::noop()->maxAttempts($maxAttempts)->retryExceptions();
-
-        $createCallback = fn(&$count)
-            /** @var AttemptLog[] $logs */
-            => function (array $logs) use (&$count) {
-                $count++;
-            };
-
-        foreach (['failureCallback', 'fallbackCallback'] as $method) {
-
-            // one callback
-            $count1 = 0;
-            $newBackoff()
-                ->$method($createCallback($count1))
-                ->attempt(fn() => throw new Exception(), null);
-            self::assertSame(1, $count1);
-
-            // two callbacks, separate params
-            $count1 = $count2 = 0;
-            $newBackoff()
-                ->$method($createCallback($count1), $createCallback($count2))
-                ->attempt(fn() => throw new Exception(), null);
-            self::assertSame(1, $count1);
-            self::assertSame(1, $count2);
-
-            // three callbacks, separate params, two in an array
-            $count1 = $count2 = $count3 = 0;
-            $newBackoff()
-                ->$method($createCallback($count1), [$createCallback($count2), $createCallback($count3)])
-                ->attempt(fn() => throw new Exception(), null);
-            self::assertSame(1, $count1);
-            self::assertSame(1, $count2);
-            self::assertSame(1, $count3);
-
-            // four callbacks, two calls, including an array
-            $count1 = $count2 = $count3 = $count4 = 0;
-            $newBackoff()
-                ->$method($createCallback($count1))
-                ->$method([$createCallback($count2), $createCallback($count3), $createCallback($count4)])
-                ->attempt(fn() => throw new Exception(), null);
-            self::assertSame(1, $count1);
-            self::assertSame(1, $count2);
-            self::assertSame(1, $count3);
-            self::assertSame(1, $count4);
-
-            // three callbacks, separate calls
-            $count1 = $count2 = $count3 = 0;
-            $newBackoff()
-                ->$method($createCallback($count1))
-                ->$method($createCallback($count2))
-                ->$method($createCallback($count3))
-                ->attempt(fn() => throw new Exception(), null);
-            self::assertSame(1, $count1);
-            self::assertSame(1, $count2);
-            self::assertSame(1, $count3);
-
-            // one callback as a callable array
-            $invokableClass = new InvokableClass();
-            $callable = [$invokableClass, '__invoke'];
-
-            $newBackoff()
-                ->$method($callable)
-                ->attempt(fn() => throw new Exception(), null);
-            self::assertSame(1, $invokableClass->getCount());
-        }
-    }
-
-    /**
-     * Test that the failure callback is called only once when expected, even if exceptions or invalid values have
-     * caused multiple retries.
-     *
-     * @test
-     *
-     * @return void
-     */
-    #[Test]
-    public static function test_that_failure_callbacks_are_called_only_once_when_expected(): void
-    {
-        $createCallback = fn(&$count)
-            /** @var AttemptLog[] $logs */
-            => function (array $logs) use (&$count) {
-                $count++;
-            };
-
-        // generate a callback that throws a callback until it's been called a certain number of times
-        $succeedAfterXCallback = function ($count) {
-            $current = 0;
-            return function () use (&$current, $count) {
-                $current++;
-                if ($current < $count) {
-                    throw new Exception();
-                }
-            };
-        };
-
-        foreach ([0, 1, 5] as $maxAttempts) {
-            foreach ([ 1, 2, 4, 5, 6] as $succeedAfter) {
-
-                // when a default value is returned
-                $count1 = 0;
-                Backoff::noop()
-                    ->retryExceptions()
-                    ->maxAttempts($maxAttempts)
-                    ->failureCallback($createCallback($count1))
-                    ->attempt($succeedAfterXCallback($succeedAfter), null);
-
-                $expectedCount = ($maxAttempts <= 0) || ($succeedAfter > $maxAttempts) ? 1 : 0;
-                self::assertSame($expectedCount, $count1); // <<<
-
-                // even when the exception is rethrown
-                $count1 = 0;
-                try {
-                    Backoff::noop()
-                        ->retryExceptions()
-                        ->maxAttempts($maxAttempts)
-                        ->failureCallback($createCallback($count1))
-                        ->attempt($succeedAfterXCallback($succeedAfter));
-                } catch (Throwable) {
-                }
-                $expectedCount = ($maxAttempts <= 0) || ($succeedAfter > $maxAttempts) ? 1 : 0;
-                self::assertSame($expectedCount, $count1); // <<<
-            }
-        }
-    }
-
-    /**
-     * Test that the array of AttemptLogs are passed to failure callbacks.
-     *
-     * @test
-     *
-     * @return void
-     */
-    #[Test]
-    public static function test_that_attempt_logs_are_passed_to_failure_callbacks(): void
-    {
-        foreach ([0, 1, 2, 3, 4] as $maxAttempts) {
-
-            $passedLogs = null;
-            $callback = function (array $logs) use (&$passedLogs) {
-                /** @var AttemptLog[] $logs */
-                $passedLogs = $logs;
-            };
-
-            $backoff = Backoff::noop()
-                ->retryExceptions()
-                ->maxAttempts($maxAttempts)
-                ->failureCallback($callback);
-            $backoff->attempt(fn() => throw new Exception(), null);
-
-            self::assertSame($backoff->logs(), $passedLogs);
-        }
-    }
-
-
-
-
-
-    /**
-     * Test that different combinations of finallyCallbacks are called.
-     *
-     * @test
-     *
-     * @return void
-     */
-    #[Test]
-    public static function test_that_every_finally_callback_is_called()
-    {
-        $maxAttempts = 5;
-        $newBackoff = fn() => Backoff::noop()->maxAttempts($maxAttempts)->retryExceptions();
-
-        $createCallback = fn(&$count)
-            /** @var AttemptLog[] $logs */
-            => function (array $logs) use (&$count) {
-                $count++;
-            };
-
-
-
-        // one callback
-        $count1 = 0;
-        $newBackoff()
-            ->finallyCallback($createCallback($count1))
-            ->attempt(fn() => true, null);
-        self::assertSame(1, $count1);
-
-        // two callbacks, separate params
-        $count1 = $count2 = 0;
-        $newBackoff()
-            ->finallyCallback($createCallback($count1), $createCallback($count2))
-            ->attempt(fn() => true, null);
-        self::assertSame(1, $count1);
-        self::assertSame(1, $count2);
-
-        // three callbacks, separate params, two in an array
-        $count1 = $count2 = $count3 = 0;
-        $newBackoff()
-            ->finallyCallback($createCallback($count1), [$createCallback($count2), $createCallback($count3)])
-            ->attempt(fn() => true, null);
-        self::assertSame(1, $count1);
-        self::assertSame(1, $count2);
-        self::assertSame(1, $count3);
-
-        // four callbacks, two calls, including an array
-        $count1 = $count2 = $count3 = $count4 = 0;
-        $newBackoff()
-            ->finallyCallback($createCallback($count1))
-            ->finallyCallback([$createCallback($count2), $createCallback($count3), $createCallback($count4)])
-            ->attempt(fn() => true, null);
-        self::assertSame(1, $count1);
-        self::assertSame(1, $count2);
-        self::assertSame(1, $count3);
-        self::assertSame(1, $count4);
-
-        // three callbacks, separate calls
-        $count1 = $count2 = $count3 = 0;
-        $newBackoff()
-            ->finallyCallback($createCallback($count1))
-            ->finallyCallback($createCallback($count2))
-            ->finallyCallback($createCallback($count3))
-            ->attempt(fn() => true, null);
-        self::assertSame(1, $count1);
-        self::assertSame(1, $count2);
-        self::assertSame(1, $count3);
-
-        // one callback as a callable array
-        $invokableClass = new InvokableClass();
-        $callable = [$invokableClass, '__invoke'];
-
-        $newBackoff()
-            ->finallyCallback($callable)
-            ->attempt(fn() => true, null);
-        self::assertSame(1, $invokableClass->getCount());
-    }
-
-    /**
-     * Test that the finally callback is called only once when expected, even if exceptions or invalid values have
-     * caused multiple retries.
-     *
-     * @test
-     *
-     * @return void
-     */
-    #[Test]
-    public static function test_that_finally_callbacks_are_called_only_once_when_expected(): void
-    {
-        $createCallback = fn(&$count)
-            /** @var AttemptLog[] $logs */
-            => function (array $logs) use (&$count) {
-                $count++;
-            };
-
-        // generate a callback that throws a callback until it's been called a certain number of times
-        $succeedAfterXCallback = function ($count) {
-            $current = 0;
-            return function () use (&$current, $count) {
-                $current++;
-                if ($current < $count) {
-                    throw new Exception();
-                }
-            };
-        };
-
-        foreach ([0, 1, 5] as $maxAttempts) {
-            foreach ([ 1, 2, 4, 5, 6] as $succeedAfter) {
-
-                // when a default value is returned
-                $count1 = 0;
-                Backoff::noop()
-                    ->retryExceptions()
-                    ->maxAttempts($maxAttempts)
-                    ->finallyCallback($createCallback($count1))
-                    ->attempt($succeedAfterXCallback($succeedAfter), null);
-
-                self::assertSame(1, $count1); // <<<
-
-                // even when the exception is rethrown
-                $count1 = 0;
-                try {
-                    Backoff::noop()
-                        ->retryExceptions()
-                        ->maxAttempts($maxAttempts)
-                        ->finallyCallback($createCallback($count1))
-                        ->attempt($succeedAfterXCallback($succeedAfter));
-                } catch (Throwable) {
-                }
-
-                self::assertSame(1, $count1); // <<<
-            }
-        }
-    }
-
-    /**
-     * Test that the array of AttemptLogs are passed to finally callbacks.
-     *
-     * @test
-     *
-     * @return void
-     */
-    #[Test]
-    public static function test_that_attempt_logs_are_passed_to_finally_callbacks(): void
-    {
-        foreach ([0, 1, 2, 3, 4] as $maxAttempts) {
-
-            $passedLogs = null;
-            $callback = function (array $logs) use (&$passedLogs) {
-                /** @var AttemptLog[] $logs */
-                $passedLogs = $logs;
-            };
-
-            $backoff = Backoff::noop()
-                ->retryExceptions()
-                ->maxAttempts($maxAttempts)
-                ->finallyCallback($callback);
-            $backoff->attempt(fn() => true, null);
-
-            self::assertSame($backoff->logs(), $passedLogs);
-        }
     }
 
 
@@ -2706,7 +808,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
     ): void {
 
         $backoff = Backoff::noop();
-        $backoff->calculate(); // causes the strategy to "start"
+        $backoff->step(false); // causes the strategy to "start"
 
         $caughtException = false;
         try {
@@ -2735,12 +837,12 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
             [ fn(Backoff $backoff) => $backoff->noJitter() ],
 
             [ fn(Backoff $backoff) => $backoff->maxAttempts(1) ],
-            [ fn(Backoff $backoff) => $backoff->noAttemptLimit() ],
             [ fn(Backoff $backoff) => $backoff->noMaxAttempts() ],
+            [ fn(Backoff $backoff) => $backoff->noAttemptLimit() ],
 
             [ fn(Backoff $backoff) => $backoff->maxDelay(1) ],
-            [ fn(Backoff $backoff) => $backoff->noDelayLimit() ],
             [ fn(Backoff $backoff) => $backoff->noMaxDelay() ],
+            [ fn(Backoff $backoff) => $backoff->noDelayLimit() ],
 
             [ fn(Backoff $backoff) => $backoff->unit(Settings::UNIT_SECONDS) ],
             [ fn(Backoff $backoff) => $backoff->unitSeconds() ],
@@ -2763,7 +865,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
 
 
     /**
-     * Test the AttemptLogs that are passed to callbacks
+     * Test the AttemptLogs that are passed to callbacks.
      *
      * retryExceptions(), exceptionCallback(), retryWhen(), retryUntil(), invalidResultCallback().
      *
@@ -2853,31 +955,31 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 $prevDelaySequence[] = $l->prevDelay();
                 is_null($l->prevDelayInSeconds())
                     ? self::assertNull($l->prevDelayInSeconds())
-                    : self::assertSame((float) ($l->prevDelay() / 1000), $l->prevDelayInSeconds());
+                    : self::assertSame((float) $l->prevDelay() / 1000, $l->prevDelayInSeconds());
                 is_null($l->prevDelayInMs())
                     ? self::assertNull($l->prevDelayInMs())
                     : self::assertSame($l->prevDelay(), $l->prevDelayInMs());
                 is_null($l->prevDelayInUs())
                     ? self::assertNull($l->prevDelayInUs())
-                    : self::assertSame($l->prevDelay() * 1000, $l->prevDelayInUs());
+                    : self::assertSame((int) $l->prevDelay() * 1000, $l->prevDelayInUs());
 
                 // next-delay
                 $nextDelaySequence[] = $l->nextDelay();
                 is_null($l->nextDelayInSeconds())
                     ? self::assertNull($l->nextDelayInSeconds())
-                    : self::assertSame((float) ($l->nextDelay() / 1000), $l->nextDelayInSeconds());
+                    : self::assertSame((float) $l->nextDelay() / 1000, $l->nextDelayInSeconds());
                 is_null($l->nextDelayInMs())
                     ? self::assertNull($l->nextDelayInMs())
                     : self::assertSame($l->nextDelay(), $l->nextDelayInMs());
                 is_null($l->nextDelayInUs())
                     ? self::assertNull($l->nextDelayInUs())
-                    : self::assertSame($l->nextDelay() * 1000, $l->nextDelayInUs());
+                    : self::assertSame((int) $l->nextDelay() * 1000, $l->nextDelayInUs());
 
                 // overall delay
                 $overallDelaySequence[] = $l->overallDelay();
                 is_null($l->overallDelay())
                     ? self::assertNull($l->overallDelayInSeconds())
-                    : self::assertSame((float) ($l->overallDelay() / 1000), $l->overallDelayInSeconds());
+                    : self::assertSame((float) $l->overallDelay() / 1000, $l->overallDelayInSeconds());
                 is_null($l->overallDelay())
                     ? self::assertNull($l->overallDelayInMs())
                     : self::assertSame($l->overallDelay(), $l->overallDelayInMs());

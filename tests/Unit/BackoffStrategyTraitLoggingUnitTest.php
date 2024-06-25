@@ -45,6 +45,10 @@ class BackoffStrategyTraitLoggingUnitTest extends PHPUnitTestCase
         /** @var AttemptLog[] $logs */
         $logs = $generateLogs();
 
+        $makeNumeric = fn(int|float|null $value): int|float => is_numeric($value)
+            ? $value
+            : 0;
+
 
 
         self::assertCount(3, $logs);
@@ -100,7 +104,10 @@ class BackoffStrategyTraitLoggingUnitTest extends PHPUnitTestCase
         self::assertSame(Settings::UNIT_MICROSECONDS, $logs[1]->unitType());
 
         // overall working time should be the sum of the individual working times
-        self::assertSame($logs[1]->overallWorkingTime(), $logs[0]->workingTime() + $logs[1]->workingTime());
+        self::assertSame(
+            $logs[1]->overallWorkingTime(),
+            $makeNumeric($logs[0]->workingTime()) + $makeNumeric($logs[1]->workingTime())
+        );
 
 
 
@@ -189,7 +196,7 @@ class BackoffStrategyTraitLoggingUnitTest extends PHPUnitTestCase
             $attempts = 10;
             while (($attempts-- > 0) && ($backoff->step())) {
                 $backoff->startOfAttempt()->endOfAttempt();
-                $currentLog = $backoff->currentLog(); // <<< calls currentLog() inside the loop
+                $backoff->currentLog(); // <<< calls currentLog() inside the loop
             }
             return $backoff->logs();
         };
@@ -202,7 +209,7 @@ class BackoffStrategyTraitLoggingUnitTest extends PHPUnitTestCase
             $attempts = 10;
             while (($attempts-- > 0) && ($backoff->step())) {
                 $backoff->startOfAttempt()->endOfAttempt();
-                $currentLog = $backoff->currentLog(); // <<< calls currentLog() inside the loop
+                $backoff->currentLog(); // <<< calls currentLog() inside the loop
             }
             return $backoff->logs();
         };
@@ -239,7 +246,7 @@ class BackoffStrategyTraitLoggingUnitTest extends PHPUnitTestCase
             $attempts = 10;
             do {
                 $backoff->startOfAttempt()->endOfAttempt();
-                $currentLog = $backoff->currentLog(); // <<< calls currentLog() inside the loop
+                $backoff->currentLog(); // <<< calls currentLog() inside the loop
             } while (($attempts-- > 0) && ($backoff->step()));
             return $backoff->logs();
         };
@@ -252,7 +259,7 @@ class BackoffStrategyTraitLoggingUnitTest extends PHPUnitTestCase
             $attempts = 10;
             do {
                 $backoff->startOfAttempt()->endOfAttempt();
-                $currentLog = $backoff->currentLog(); // <<< calls currentLog() inside the loop
+                $backoff->currentLog(); // <<< calls currentLog() inside the loop
             } while (($attempts-- > 0) && ($backoff->step()));
             return $backoff->logs();
         };
@@ -274,7 +281,7 @@ class BackoffStrategyTraitLoggingUnitTest extends PHPUnitTestCase
     public static function test_what_current_log_returns(): void
     {
         $algorithm = new NoopBackoffAlgorithm();
-        $backoff = new BackoffStrategy($algorithm);
+        $backoff = new BackoffStrategy($algorithm, null, 3);
 
         // not started yet
         $attemptLog1a = $backoff->currentLog(); // not available yet
@@ -297,6 +304,9 @@ class BackoffStrategyTraitLoggingUnitTest extends PHPUnitTestCase
         $backoff->endOfAttempt();
         $attemptLog3c = $backoff->currentLog(); // same as $attemptLog3b
 
+        $backoff->step();
+        $attemptLog4a = $backoff->currentLog(); // won't be available, has stopped
+
         self::assertNull($attemptLog1a);
         self::assertInstanceOf(AttemptLog::class, $attemptLog1b);
         self::assertSame($attemptLog1b, $attemptLog1c);
@@ -308,6 +318,8 @@ class BackoffStrategyTraitLoggingUnitTest extends PHPUnitTestCase
         self::assertNull($attemptLog3a);
         self::assertInstanceOf(AttemptLog::class, $attemptLog3b);
         self::assertSame($attemptLog3b, $attemptLog3c);
+
+        self::assertNull($attemptLog4a);
 
         self::assertNotSame($attemptLog1b, $attemptLog2b);
         self::assertNotSame($attemptLog2a, $attemptLog3b);
@@ -325,7 +337,7 @@ class BackoffStrategyTraitLoggingUnitTest extends PHPUnitTestCase
     {
         $algorithm = new NoopBackoffAlgorithm();
 
-        // logs are ok (maxAttempts 3)
+        // logs are ok (maxAttempts null)
         $backoff = new BackoffStrategy(
             $algorithm,
             null,
@@ -375,7 +387,7 @@ class BackoffStrategyTraitLoggingUnitTest extends PHPUnitTestCase
         }
         self::assertTrue($caughtException);
 
-        self::assertSame(1, $backoff->currentAttemptNumber());
+        self::assertNull($backoff->currentAttemptNumber());
         self::assertNull($backoff->currentLog());
         self::assertCount(0, $backoff->logs());
     }
@@ -500,7 +512,7 @@ class BackoffStrategyTraitLoggingUnitTest extends PHPUnitTestCase
         self::assertCount(2, $backoff->logs());
 
         $backoff->reset();
-        self::assertSame(1, $backoff->currentAttemptNumber());
+        self::assertNull($backoff->currentAttemptNumber());
         self::assertCount(2, $backoff->logs()); // the logs aren't reset until looping starts again
 
         $backoff->step();
@@ -592,5 +604,34 @@ class BackoffStrategyTraitLoggingUnitTest extends PHPUnitTestCase
         $attemptLog2 = $backoff->currentLog();
         self::assertInstanceOf(AttemptLog::class, $attemptLog1);
         self::assertSame($attemptLog1, $attemptLog2);
+    }
+
+    /**
+     * Test that no AttemptLogs are created when startOfAttempt() isn't called.
+     *
+     * When handling the loop yourself, ->startOfAttempt() and ->endOfAttempt() must be called to generate logs.
+     *
+     * This is because while ->step() could call ->startOfAttempt(), it doesn't know when the final attempt has ended.
+     *
+     * @test
+     *
+     * @return void
+     */
+    #[Test]
+    public static function test_that_no_logs_are_created_when_start_of_attempt_isnt_called(): void
+    {
+        $algorithm = new NoopBackoffAlgorithm();
+        $backoff = new BackoffStrategy($algorithm);
+
+        $attemptLog1 = $backoff->currentLog();
+        $backoff->step();
+        $attemptLog2 = $backoff->currentLog();
+        $backoff->step();
+        $attemptLog3 = $backoff->currentLog();
+
+        self::assertNull($attemptLog1);
+        self::assertNull($attemptLog2);
+        self::assertNull($attemptLog3);
+        self::assertSame([], $backoff->logs());
     }
 }

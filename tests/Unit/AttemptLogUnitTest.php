@@ -41,7 +41,7 @@ class AttemptLogUnitTest extends PHPUnitTestCase
      */
     #[Test]
     #[DataProvider('attemptLogDataProvider')]
-    public static function test_backoff_attempt_dto(
+    public static function test_backoff_attempt_dto_initialisation_and_retrieving_values(
         int $attemptNumber,
         ?int $maxAttempts,
         DateTime $firstAttemptOccurredAt,

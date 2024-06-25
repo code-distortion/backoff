@@ -98,7 +98,7 @@ class SupportUnitTest extends PHPUnitTestCase
         }
 
         asort($decimalPlaceCounts);
-        return array_key_last($decimalPlaceCounts);
+        return (int) array_key_last($decimalPlaceCounts);
     }
 
     /**
@@ -170,32 +170,23 @@ class SupportUnitTest extends PHPUnitTestCase
                     $expected = null;
                     if (!is_null($timespan)) {
 
-                        switch ($currentUnitType) {
-
-                            case Settings::UNIT_MICROSECONDS:
-                                $multiplier = match ($desiredUnitType) {
-                                    Settings::UNIT_MICROSECONDS => 1.0,
-                                    Settings::UNIT_MILLISECONDS => 0.001,
-                                    default => 0.000_001, // Settings::UNIT_SECONDS
-                                };
-                                break;
-
-                            case Settings::UNIT_MILLISECONDS:
-                                $multiplier = match ($desiredUnitType) {
-                                    Settings::UNIT_MICROSECONDS => 1_000,
-                                    Settings::UNIT_MILLISECONDS => 1.0,
-                                    default => 0.001, // Settings::UNIT_SECONDS
-                                };
-                                break;
-
-                            default: // Settings::UNIT_SECONDS:
-                                $multiplier = match ($desiredUnitType) {
-                                    Settings::UNIT_MICROSECONDS => 1_000_000,
-                                    Settings::UNIT_MILLISECONDS => 1_000,
-                                    default => 1.0, // Settings::UNIT_SECONDS
-                                };
-                                break;
-                        }
+                        $multiplier = match ($currentUnitType) {
+                            Settings::UNIT_MICROSECONDS => match ($desiredUnitType) {
+                                Settings::UNIT_MICROSECONDS => 1.0,
+                                Settings::UNIT_MILLISECONDS => 0.001,
+                                default => 0.000_001, // Settings::UNIT_SECONDS
+                            },
+                            Settings::UNIT_MILLISECONDS => match ($desiredUnitType) {
+                                Settings::UNIT_MICROSECONDS => 1_000,
+                                Settings::UNIT_MILLISECONDS => 1.0,
+                                default => 0.001, // Settings::UNIT_SECONDS
+                            },
+                            default => match ($desiredUnitType) {
+                                Settings::UNIT_MICROSECONDS => 1_000_000,
+                                Settings::UNIT_MILLISECONDS => 1_000,
+                                default => 1.0, // Settings::UNIT_SECONDS
+                            },
+                        };
 
                         $expected = $timespan * $multiplier;
                     }

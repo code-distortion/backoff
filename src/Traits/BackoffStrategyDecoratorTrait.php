@@ -30,7 +30,7 @@ use CodeDistortion\Backoff\Settings;
  *
  * @see BackoffStrategyTrait
  */
-trait BackoffDecoratorTrait
+trait BackoffStrategyDecoratorTrait
 {
     use BackoffStrategyTrait;
 
@@ -204,7 +204,7 @@ trait BackoffDecoratorTrait
      * @param boolean       $includeFirst Whether to include the first value in the Fibonacci sequence or not.
      * @return static
      */
-    public static function fibonacci(int|float $initialDelay, bool $includeFirst = false): static
+    public static function fibonacci(int|float $initialDelay, bool $includeFirst = true): static
     {
         $algorithm = new FibonacciBackoffAlgorithm($initialDelay, $includeFirst);
         return static::new($algorithm)->maxAttempts(self::$defaultMaxAttempts)->fullJitter();
@@ -217,7 +217,7 @@ trait BackoffDecoratorTrait
      * @param boolean $includeFirst Whether to include the first value in the Fibonacci sequence or not.
      * @return static
      */
-    public static function fibonacciMs(int $initialDelay, bool $includeFirst = false): static
+    public static function fibonacciMs(int $initialDelay, bool $includeFirst = true): static
     {
         return static::fibonacci($initialDelay, $includeFirst)->unitMs();
     }
@@ -229,7 +229,7 @@ trait BackoffDecoratorTrait
      * @param boolean $includeFirst Whether to include the first value in the Fibonacci sequence or not.
      * @return static
      */
-    public static function fibonacciUs(int $initialDelay, bool $includeFirst = false): static
+    public static function fibonacciUs(int $initialDelay, bool $includeFirst = true): static
     {
         return static::fibonacci($initialDelay, $includeFirst)->unitUs();
     }
@@ -323,45 +323,44 @@ trait BackoffDecoratorTrait
      * Note: default maxAttempts() is not set for sequence(), as it's assumed the sequence's length will be chosen to be
      * the desired length.
      *
-     * @param array<integer|float> $delays       The sequence of delays to use.
-     * @param integer|float|null   $continuation The delay to use (when present) after the sequence has been exhausted.
+     * @param array<integer|float> $delays The sequence of delays to use.
+     * @param boolean              $repeat Repeat the last delay indefinitely if more retries are needed.
      * @return static
      */
-    public static function sequence(array $delays, int|float|null $continuation = null): static
+    public static function sequence(array $delays, bool $repeat = false): static
     {
-        $algorithm = new SequenceBackoffAlgorithm($delays, $continuation);
-        $strategy = static::new($algorithm);
+        $algorithm = new SequenceBackoffAlgorithm($delays, $repeat);
+        $strategy = static::new($algorithm)->fullJitter();
 
-        // only apply max-attempts when a continuation value is present
-        // otherwise the sequence will be allowed to continue until the sequence is exhausted
-        if (!is_null($continuation)) {
+        if ($repeat) {
             $strategy->maxAttempts(self::$defaultMaxAttempts);
         }
+
         return $strategy;
     }
 
     /**
      * Create a new backoff strategy using the sequence backoff algorithm, in milliseconds.
      *
-     * @param array<integer> $delays       The sequence of delays to use.
-     * @param integer|null   $continuation The delay to use (when present) after the sequence has been exhausted.
+     * @param array<integer> $delays The sequence of delays to use.
+     * @param boolean        $repeat Repeat the last delay indefinitely if more retries are needed.
      * @return static
      */
-    public static function sequenceMs(array $delays, int|null $continuation = null): static
+    public static function sequenceMs(array $delays, bool $repeat = false): static
     {
-        return static::sequence($delays, $continuation)->unitMs();
+        return static::sequence($delays, $repeat)->unitMs();
     }
 
     /**
      * Create a new backoff strategy using the sequence backoff algorithm, in microseconds.
      *
-     * @param array<integer> $delays       The sequence of delays to use.
-     * @param integer|null   $continuation The delay to use (when present) after the sequence has been exhausted.
+     * @param array<integer> $delays The sequence of delays to use.
+     * @param boolean        $repeat Repeat the last delay indefinitely if more retries are needed.
      * @return static
      */
-    public static function sequenceUs(array $delays, int|null $continuation = null): static
+    public static function sequenceUs(array $delays, bool $repeat = false): static
     {
-        return static::sequence($delays, $continuation)->unitUs();
+        return static::sequence($delays, $repeat)->unitUs();
     }
 
 
@@ -445,7 +444,7 @@ trait BackoffDecoratorTrait
     public static function noop(): static
     {
         $algorithm = new NoopBackoffAlgorithm();
-        return static::new($algorithm)->maxAttempts(self::$defaultMaxAttempts)->fullJitter();
+        return static::new($algorithm)->maxAttempts(self::$defaultMaxAttempts);
     }
 
 
@@ -458,7 +457,7 @@ trait BackoffDecoratorTrait
     public static function none(): static
     {
         $algorithm = new NoBackoffAlgorithm();
-        return static::new($algorithm)->fullJitter();
+        return static::new($algorithm);
     }
 
 
@@ -507,7 +506,6 @@ trait BackoffDecoratorTrait
      * @param integer|float $min The jitter starting point, expressed as a percentage of the delay. e.g. 0.75 for 75%.
      * @param integer|float $max The jitter end point, expressed as a percentage of the delay. e.g. 1.25 for 125%.
      * @return $this
-     * @throws BackoffInitialisationException Thrown when the min is greater than the max.
      * @throws BackoffRuntimeException When the backoff process has already started.
      */
     public function jitterRange(int|float $min, int|float $max): static
@@ -605,7 +603,7 @@ trait BackoffDecoratorTrait
      * @return $this
      * @throws BackoffRuntimeException When the backoff process has already started.
      */
-    public function noAttemptLimit(): static
+    public function noMaxAttempts(): static
     {
         if ($this->hasStarted()) {
             throw BackoffRuntimeException::attemptToChangeAfterStart(__FUNCTION__);
@@ -620,14 +618,14 @@ trait BackoffDecoratorTrait
     /**
      * Specify that no limit should be applied to the number of attempts allowed.
      *
-     * Alias for noAttemptLimit().
+     * Alias for noMaxAttempts().
      *
-     * @see noAttemptLimit()
+     * @see noMaxAttempts()
      *
      * @return $this
      * @throws BackoffRuntimeException When the backoff process has already started.
      */
-    public function noMaxAttempts(): static
+    public function noAttemptLimit(): static
     {
         if ($this->hasStarted()) {
             throw BackoffRuntimeException::attemptToChangeAfterStart(__FUNCTION__);
@@ -669,7 +667,7 @@ trait BackoffDecoratorTrait
      * @return $this
      * @throws BackoffRuntimeException When the backoff process has already started.
      */
-    public function noDelayLimit(): static
+    public function noMaxDelay(): static
     {
         if ($this->hasStarted()) {
             throw BackoffRuntimeException::attemptToChangeAfterStart(__FUNCTION__);
@@ -683,14 +681,14 @@ trait BackoffDecoratorTrait
     /**
      * Specify that no limit should be applied to the delay.
      *
-     * Alias for noDelayLimit().
+     * Alias for noMaxDelay().
      *
-     * @see noDelayLimit()
+     * @see noMaxDelay()
      *
      * @return $this
      * @throws BackoffRuntimeException When the backoff process has already started.
      */
-    public function noMaxDelay(): static
+    public function noDelayLimit(): static
     {
         if ($this->hasStarted()) {
             throw BackoffRuntimeException::attemptToChangeAfterStart(__FUNCTION__);

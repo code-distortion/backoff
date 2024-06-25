@@ -40,7 +40,7 @@ final class AttemptLog
         private int|float|null $overallDelay,
         private string $unitType,
     ) {
-        if (!in_array($this->unitType, Settings::ALL_UNIT_TYPES)) {
+        if (!in_array($this->unitType, Settings::ALL_UNIT_TYPES, true)) {
             throw BackoffInitialisationException::invalidUnitType($this->unitType);
         }
     }

@@ -11,7 +11,8 @@
 It's useful when you're working with services that might be temporarily unavailable, such as APIs.
 
 ```php
-// let Backoff manage the retries and delays for you
+// let Backoff manage the delays and trigger retries for you
+$action = fn() => …; // do some work
 $result = Backoff::exponential(2)->maxAttempts(10)->maxDelay(30)->attempt($action);
 ```
 
@@ -22,12 +23,10 @@ $result = Backoff::exponential(2)->maxAttempts(10)->maxDelay(30)->attempt($actio
 ## Table of Contents
 
 - [Installation](#installation)
-- [General Tips](#general-tips)
+- [General Backoff Tips](#general-backing-off-tips)
   - [Further Reading](#further-reading)
 - [Cheatsheet](#cheatsheet)
 - [Usage](#usage)
-  - [Use Backoff to Manage the Retry Process](#use-backoff-to-manage-the-retry-process)
-  - [Or Manage The Retry Loop Yourself](#or-manage-the-retry-loop-yourself)
 - [Backoff Algorithms](#backoff-algorithms)
   - [Fixed Backoff](#fixed-backoff)
   - [Linear Backoff](#linear-backoff)
@@ -58,7 +57,7 @@ $result = Backoff::exponential(2)->maxAttempts(10)->maxDelay(30)->attempt($actio
   - [Retry When Particular Exceptions Occur](#retry-when-particular-exceptions-occur)
   - [Don't Retry When Exceptions Occur](#dont-retry-when-exceptions-occur)
 - [Managing "Invalid" Return Values](#managing-invalid-return-values)
-  - [Retry When](#retry-when) 
+  - [Retry When](#retry-when)
   - [Retry Until](#retry-until)
 - [Callbacks](#callbacks)
   - [Exception Callback](#exception-callback)
@@ -68,9 +67,15 @@ $result = Backoff::exponential(2)->maxAttempts(10)->maxDelay(30)->attempt($actio
   - [Finally Callback](#finally-callback)
 - [Logging](#logging)
   - [The AttemptLog Class](#the-attemptlog-class)
-- [Backoff and Test Suites](#backoff-and-test-suites)
+- [Working With Test Suites](#working-with-test-suites)
   - [Disabling Backoff](#disabling-backoff)
   - [Disabling Retries](#disabling-retries)
+- [Managing the Retry Loop Yourself](#managing-the-retry-loop-yourself)
+  - [The Basic Loop](#the-basic-loop)
+  - [Catching Exceptions in Your Loop](#catching-exceptions-in-your-loop)
+  - [Deconstructing the Backoff Logic](#deconstructing-the-backoff-logic)
+  - [Working With Logs](#working-with-logs)
+  - [Helpers When Managing The Loop Yourself](#helpers-when-managing-the-loop-yourself)
 - [Modelling](#modelling)
 
 
@@ -85,186 +90,203 @@ composer require code-distortion/backoff
 
 
 
-## General Tips
+## General Backoff Tips
 
 - Backoff attempts are intended to be used when actions fail because of **transient** issues (such as temporary service outages). When **permanent** errors occur (such as a 404 HTTP response), [retrying should stop](#managing-exceptions) as it won't help.
 - Be careful when nesting backoff attempts. This can unexpectedly increase the number of attempts and time taken.
-- Actions taken during backoff attempts should be idempotent. Meaning, if the same action is performed multiple times, the result should be the same as if it were only performed once.
+- Actions taken during backoff attempts should be idempotent. Meaning, if the same action is performed multiple times, the outcome should be the same as if it were only performed once.
 
 
 
 ### Further Reading
 
-- The article [Timeouts, retries, and backoff with jitter](https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/) by Marc Brooker at AWS does a good job of explaining the concepts involved when using backoff.
+- The article [Timeouts, retries, and backoff with jitter](https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/) by Marc Brooker at AWS does a good job of explaining the concepts involved when using backoff strategies.
 - The article [Exponential Backoff And Jitter](https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/) also by Marc Brooker is a good read if you're interested in the theory behind backoff algorithms and jitter. Marc [explains the same concepts in a 2019 talk](https://www.youtube.com/watch?v=sKRdemSirDM&t=1896s).
 
 
 
 ## Cheatsheet
 
+Quick examples…
+
 ```php
-// usual case
+// the usual case
 $action = fn() => …; // do some work
 $result = Backoff::exponential(2)->maxAttempts(10)->maxDelay(30)->attempt($action);
 
 // selection of examples
-$result = Backoff::exponential(2)->attempt($action, $default);
-Backoff::exponential(2)->equalJitter()->immediateFirstRetry()->attempt($action);
-Backoff::exponential(2)->retryExceptions(MyException::class)->attempt($action);
-Backoff::exponential(2)->retryWhen(false)->attempt($action);
-Backoff::exponential(2)->failureCallback($failed)->attempt($action);
+$result = Backoff::exponential(1)->attempt($action, $default);
+Backoff::polynomial(1)->attempt($action);
+Backoff::sequence([1, 2, 3, 5, 10])->attempt($action);
+Backoff::exponential(1)->equalJitter()->immediateFirstRetry()->attempt($action);
+Backoff::exponential(1)->retryExceptions(MyException::class)->attempt($action);
+Backoff::exponential(1)->retryWhen(false)->attempt($action);
+Backoff::exponential(1)->retryUntil(true)->attempt($action);
+Backoff::exponential(1)->failureCallback($failed)->attempt($action);
 ```
 
-Start by picking a backoff algorithm to use…
+Start by picking an algorithm to use…
 
 ```php
 // backoff algorithms - in seconds
-Backoff::fixed(2)                       // 2, 2, 2, 2, 2…
-Backoff::linear(5)                      // 5, 10, 15, 20, 25…
-Backoff::linear(5, 10)                  // 5, 15, 25, 35, 45…
-Backoff::exponential(1)                 // 1, 2, 4, 8, 16…
-Backoff::exponential(1, 1.5)            // 1, 1.5, 2.25, 3.375, 5.0625…
-Backoff::polynomial(1)                  // 1, 4, 9, 16, 25…
-Backoff::polynomial(1, 1.5)             // 1, 2.8284271247462, 5.1961524227066, 8, 11.180339887499…
-Backoff::fibonacci(1)                   // 1, 1, 2, 3, 5…
-Backoff::decorrelated(1)                // 1.6147780669, 2.9651922732, 5.7128698436, 10.3225378844, 2.3890401166…
-Backoff::random(2, 5)                   // 2.7361497528, 2.8163467878, 4.6468904857, 3.3016198676, 3.3810068137…
-Backoff::sequence([1, 2, 3, 5, 10])     // 1, 2, 3, 5, 10
-Backoff::sequence([1, 2, 3, 5, 10], 15) // 1, 2, 3, 5, 10, 15, 15, 15, 15, 15…
-Backoff::callback($callback)            // $callback(1, $prev), $callback(2, $prev), $callback(3, $prev)…
-Backoff::custom($backoffAlgorithm)      // delay managed by a custom backoff algorithm class
+Backoff::fixed(2)                         // 2, 2, 2, 2, 2…
+Backoff::linear(5)                        // 5, 10, 15, 20, 25…
+Backoff::linear(5, 10)                    // 5, 15, 25, 35, 45…
+Backoff::exponential(1)                   // 1, 2, 4, 8, 16…
+Backoff::exponential(1, 1.5)              // 1, 1.5, 2.25, 3.375, 5.0625…
+Backoff::polynomial(1)                    // 1, 4, 9, 16, 25…
+Backoff::polynomial(1, 1.5)               // 1, 2.8284271247462, 5.1961524227066, 8, 11.180339887499…
+Backoff::fibonacci(1)                     // 1, 1, 2, 3, 5…
+Backoff::decorrelated(1)                  // 1.6147780669, 2.9651922732, 5.7128698436, 10.3225378844, 2.3890401166…
+Backoff::random(2, 5)                     // 2.7361497528, 2.8163467878, 4.6468904857, 3.3016198676, 3.3810068137…
+Backoff::sequence([1, 2, 3, 5, 10])       // 1, 2, 3, 5, 10
+Backoff::sequence([1, 2, 3, 5, 10], true) // 1, 2, 3, 5, 10, 10, 10, 10, 10…
+Backoff::callback($callback)              // $callback(1, $prev), $callback(2, $prev), $callback(3, $prev)…
+Backoff::custom($backoffAlgorithm)        // delay managed by a custom backoff algorithm class
 
 // backoff algorithms - in milliseconds
-Backoff::fixedMs(2)                       // 2, 2, 2, 2, 2…
-Backoff::linearMs(5)                      // 5, 10, 15, 20, 25…
-Backoff::linearMs(5, 10)                  // 5, 15, 25, 35, 45…
-Backoff::exponentialMs(1)                 // 1, 2, 4, 8, 16…
-Backoff::exponentialMs(1, 1.5)            // 1, 1.5, 2.25, 3.375, 5.0625…
-Backoff::polynomialMs(1)                  // 1, 4, 9, 16, 25…
-Backoff::polynomialMs(1, 1.5)             // 1, 2.8284271247462, 5.1961524227066, 8, 11.180339887499…
-Backoff::fibonacciMs(1)                   // 1, 1, 2, 3, 5…
-Backoff::decorrelatedMs(1)                // 1.6147780669, 2.9651922732, 5.7128698436, 10.3225378844, 2.3890401166…
-Backoff::randomMs(2, 5)                   // 2.7361497528, 2.8163467878, 4.6468904857, 3.3016198676, 3.3810068137…
-Backoff::sequenceMs([1, 2, 3, 5, 10])     // 1, 2, 3, 5, 10
-Backoff::sequenceMs([1, 2, 3, 5, 10], 15) // 1, 2, 3, 5, 10, 15, 15, 15, 15, 15…
-Backoff::callbackMs($callback)            // $callback(1, $prev), $callback(2, $prev), $callback(3, $prev)…
-Backoff::customMs($backoffAlgorithm)      // delay managed by a custom backoff algorithm class
+Backoff::fixedMs(2)                         // 2, 2, 2, 2, 2…
+Backoff::linearMs(5)                        // 5, 10, 15, 20, 25…
+Backoff::linearMs(5, 10)                    // 5, 15, 25, 35, 45…
+Backoff::exponentialMs(1)                   // 1, 2, 4, 8, 16…
+Backoff::exponentialMs(1, 1.5)              // 1, 1.5, 2.25, 3.375, 5.0625…
+Backoff::polynomialMs(1)                    // 1, 4, 9, 16, 25…
+Backoff::polynomialMs(1, 1.5)               // 1, 2.8284271247462, 5.1961524227066, 8, 11.180339887499…
+Backoff::fibonacciMs(1)                     // 1, 1, 2, 3, 5…
+Backoff::decorrelatedMs(1)                  // 1.6147780669, 2.9651922732, 5.7128698436, 10.3225378844, 2.3890401166…
+Backoff::randomMs(2, 5)                     // 2.7361497528, 2.8163467878, 4.6468904857, 3.3016198676, 3.3810068137…
+Backoff::sequenceMs([1, 2, 3, 5, 10])       // 1, 2, 3, 5, 10
+Backoff::sequenceMs([1, 2, 3, 5, 10], true) // 1, 2, 3, 5, 10, 10, 10, 10, 10…
+Backoff::callbackMs($callback)              // $callback(1, $prev), $callback(2, $prev), $callback(3, $prev)…
+Backoff::customMs($backoffAlgorithm)        // delay managed by a custom backoff algorithm class
 
 // backoff algorithms - in microseconds
-Backoff::fixedUs(2)                       // 2, 2, 2, 2, 2…
-Backoff::linearUs(5)                      // 5, 10, 15, 20, 25…
-Backoff::linearUs(5, 10)                  // 5, 15, 25, 35, 45…
-Backoff::exponentialUs(1)                 // 1, 2, 4, 8, 16…
-Backoff::exponentialUs(1, 1.5)            // 1, 1.5, 2.25, 3.375, 5.0625…
-Backoff::polynomialUs(1)                  // 1, 4, 9, 16, 25…
-Backoff::polynomialUs(1, 1.5)             // 1, 2.8284271247462, 5.1961524227066, 8, 11.180339887499…
-Backoff::fibonacciUs(1)                   // 1, 1, 2, 3, 5…
-Backoff::decorrelatedUs(1)                // 1.6147780669, 2.9651922732, 5.7128698436, 10.3225378844, 2.3890401166…
-Backoff::randomUs(2, 5)                   // 2.7361497528, 2.8163467878, 4.6468904857, 3.3016198676, 3.3810068137…
-Backoff::sequenceUs([1, 2, 3, 5, 10])     // 1, 2, 3, 5, 10
-Backoff::sequenceUs([1, 2, 3, 5, 10], 15) // 1, 2, 3, 5, 10, 15, 15, 15, 15, 15…
-Backoff::callbackUs($callback)            // $callback(1, $prev), $callback(2, $prev), $callback(3, $prev)…
-Backoff::customUs($backoffAlgorithm)      // delay managed by a custom backoff algorithm class
+Backoff::fixedUs(2)                         // 2, 2, 2, 2, 2…
+Backoff::linearUs(5)                        // 5, 10, 15, 20, 25…
+Backoff::linearUs(5, 10)                    // 5, 15, 25, 35, 45…
+Backoff::exponentialUs(1)                   // 1, 2, 4, 8, 16…
+Backoff::exponentialUs(1, 1.5)              // 1, 1.5, 2.25, 3.375, 5.0625…
+Backoff::polynomialUs(1)                    // 1, 4, 9, 16, 25…
+Backoff::polynomialUs(1, 1.5)               // 1, 2.8284271247462, 5.1961524227066, 8, 11.180339887499…
+Backoff::fibonacciUs(1)                     // 1, 1, 2, 3, 5…
+Backoff::decorrelatedUs(1)                  // 1.6147780669, 2.9651922732, 5.7128698436, 10.3225378844, 2.3890401166…
+Backoff::randomUs(2, 5)                     // 2.7361497528, 2.8163467878, 4.6468904857, 3.3016198676, 3.3810068137…
+Backoff::sequenceUs([1, 2, 3, 5, 10])       // 1, 2, 3, 5, 10
+Backoff::sequenceUs([1, 2, 3, 5, 10], true) // 1, 2, 3, 5, 10, 10, 10, 10, 10…
+Backoff::callbackUs($callback)              // $callback(1, $prev), $callback(2, $prev), $callback(3, $prev)…
+Backoff::customUs($backoffAlgorithm)        // delay managed by a custom backoff algorithm class
 
 // utility backoff algorithms
 Backoff::noop() // 0, 0, 0, 0, 0…
-Backoff::none() // (no retries)
+Backoff::none() // (1 attempt, no retries)
 ```
 
-Then apply customisation if needed…
+Then customise the retry logic…
 
 ```php
 // max-attempts (default = no limit)
 ->maxAttempts(10)   // the maximum number of attempts allowed
 ->maxAttempts(null) // remove the limit, or
-->noAttemptLimit()  // remove the limit, or
-->noMaxAttempts()   // alias for noAttemptLimit()
+->noMaxAttempts()   // remove the limit, or
+->noAttemptLimit()  // alias for noMaxAttempts()
 
 // max-delay - the maximum delay to wait between each attempt (default = no limit)
 ->maxDelay(30)   // set the max-delay, in the current unit-of-measure
 ->maxDelay(null) // remove the limit, or
-->noDelayLimit() // remove the limit, or
-->noMaxDelay()   // alias for noDelayLimit()
+->noMaxDelay()   // remove the limit, or
+->noDelayLimit() // alias for noMaxDelay()
 
 // choose the type of jitter to apply to the delay (default = full jitter)
-->fullJitter()              // apply full jitter, between 0 and 100% of the delay (applied by default)
-->equalJitter()             // apply equal jitter, between 50% and 100% of the delay
-->jitterRange(0.75, 1.25)   // apply jitter between $min and $max (e.g. 0.75 = 75%, 1.25 = 125%)
+->fullJitter()              // apply full jitter, between 0 and 100% of the base-delay (applied by default)
+->equalJitter()             // apply equal jitter, between 50% and 100% of the base-delay
+->jitterRange(0.75, 1.25)   // apply jitter between $min and $max (e.g. 0.75 = 75%, 1.25 = 125%) of the base-delay
 ->jitterCallback($callback) // specify a callback that applies the jitter
 ->customJitter($jitter)     // jitter managed by a custom jitter class
-->noJitter()                // disable jitter
+->noJitter()                // disable jitter - the base-delay will be used as-is
 
 // insert an initial retry that happens straight away
-// before the backoff algorithm starts (default = off)
+// before the backoff algorithm starts generating delays (default = off)
 ->immediateFirstRetry()      // insert an immediate retry
 ->immediateFirstRetry(false) // don't insert an immediate retry, or
 ->noImmediateFirstRetry()    // don't insert an immediate retry
 
-// turn off delays or retries altogether - useful when running tests (default = enabled)
+// turn off delays or retries altogether - may be useful when running tests (default = enabled)
 ->onlyDelayWhen(!$runningTests) // enable or disable delays (disabled means delays are 0)
 ->onlyRetryWhen(!$runningTests) // enable or disable retries (disabled means only 1 attempt will be made)
 ```
 
-Here is some customisation to the retry logic you can use when [using the `->attempt()` method](#use-backoff-to-manage-the-retry-process)…
+Retry only in certain situations if you'd like…
 
 ```php
-// retries based on exceptions…
+// retry based on exceptions…
 
-// retry when any exception occurs (default)
-// if default is omitted, the final exception will be rethrown
-->retryAllExceptions($default = null)
+// retry when any exception occurs (this is the default setting)
+// along with $default which is returned if all attempts fail
+// if $default is omitted, the final exception will be rethrown
+->retryAllExceptions()
+->retryAllExceptions($default)
 
-// retry when these exceptions occur in particular,
-// along with a default value to return if all attempts fail
+// retry when these particular exceptions occur
 // (you can specify multiple types of exceptions by passing
 // them as an array, or by calling this multiple times)
+->retryExceptions(MyException::class)
 ->retryExceptions(MyException::class, $default)
-// you can also pass a callback that chooses whether to retry or not
+
+// you can also specify a callback that chooses whether to retry or not
 // (return true to retry, false to end)
 // $callback(Throwable $e, AttemptLog $log): bool
+->retryExceptions($callback);
 ->retryExceptions($callback, $default);
-// or choose not to retry when exceptions occur
+
+// or choose to NOT retry when exceptions occur
+// if $default is omitted, any exceptions will be rethrown
 ->retryExceptions(false) // or
 ->dontRetryExceptions()
+->retryExceptions(false, $default) // or
+->dontRetryExceptions($default)
 ```
 
 ```php
-// retries based on the return value…
-// (default = don't retry based on return values)
+// retry based on the return value…
+// (by default, retries won't happen based on the return value)
 
 // retry WHEN this value is returned,
-// whether to use strict comparison or not,
-// and a default value to return if all attempts fail
+// along with $default which is returned if all attempts fail
 // (you can call this multiple times to add different values)
-->retryWhen($match, $strict = false, $default = null)
-// you can also pass a callback that chooses whether to retry or not
+->retryWhen($match, $strict = false)
+->retryWhen($match, $strict, $default)
+
+// you can also specify a callback that chooses whether to retry or not
 // (return true to retry, false to end)
 // $callback(mixed $result, AttemptLog $log): bool
 ->retryWhen($callback)
+->retryWhen($callback, false, $default) // strict doesn't matter when using a callback
 
-// retry UNTIL this value is returned,
-// and whether to use strict comparison or not
+// retry UNTIL this value is returned
 // (you can call this multiple times to add different values)
 ->retryUntil($match, $strict = false)
+
 // you can also pass a callback that chooses whether to retry or not
 // (unlike ->retryWhen(…), here you return false to retry, true to end)
-->retryUntil($callback) // $callback(mixed $result, AttemptLog $log): bool
+// $callback(mixed $result, AttemptLog $log): bool
+->retryUntil($callback)
 ```
 
+Add callbacks if desired…
+
 ```php
-// callbacks…
-// (you can specify multiple at a time by passing them as an array,
-// or by calling these methods multiple times)
+// (you can specify multiple callbacks at a time by passing
+// them as an array, or by calling these methods multiple times)
 
 // called when any exception occurs
 // $callback(Throwable $e, AttemptLog $log, bool $willRetry): void
 ->exceptionCallback($callback)
 
 // called when an "invalid" value is returned
-// $callback(mixed $result, AttemptLog $log): void
+// $callback(mixed $result, AttemptLog $log, bool $willRetry): void
 ->invalidResultCallback($callback)
 
-// called after the attempt succeeds
+// called after an attempt succeeds
 // $callback(AttemptLog[] $logs): void
 ->successCallback($callback)
 
@@ -279,54 +301,20 @@ Here is some customisation to the retry logic you can use when [using the `->att
 ->finallyCallback($callback)
 ```
 
-Last, use it to run your work…
+And finally, run your work…
 
 ```php
-->attempt($action);           // run your callback and retry it when needed 
+->attempt($action);           // run your callback and retry it when needed
 ->attempt($action, $default); // run your callback, retry it when needed, and return $default if all attempts fail
-```
-
-You don't need to use these methods, but if they'll help you if you'd like to [manage the retry loop yourself](#or-manage-the-retry-loop-yourself)…
-
-```php
-// tell backoff where you're placing the call to ->step() (default = afterwards)
-->runsAtStartOfLoop()      // specify that $backoff->step() will be called at the entrance to your loop
-->runsAtStartOfLoop(false) // specify that $backoff->step() will be called at the end of your loop (default), or
-->runsAtEndOfLoop()        // specify that $backoff->step() will be called at the end of your loop (default)
-
-->step(); // calculate and perform the delay, return false when the attempts are exhausted
-
-// or, you can perform the steps that ->step() does, yourself
-->calculate(); // calculate the next delay
-->sleep();     // sleep for the delay calculated by ->calculate()
-
-// if you'd like to perform the sleep yourself instead of calling ->sleep()
-->getDelay();          // get the delay in the current unit-of-measure
-->getDelayInSeconds(); // get the delay in seconds (note: may contain decimals)
-->getDelayInMs();      // get the delay in milliseconds (note: may contain decimals)
-->getDelayInUs();      // get the delay in microseconds (note: may contain decimals)
-->getUnitType();       // get the unit-of-measure being used
-                       // these are values from CodeDistortion\Backoff\Settings::UNIT_XXX
-
-// helpers
-->currentAttemptNumber(); // get the current attempt number
-->isFirstAttempt();       // check if the first attempt is currently being made
-->isLastAttempt();        // check if the last attempt is currently being made (however it may run indefinitely)
-->hasStopped();           // check if the attempts have been exhausted - this is triggered by ->calculate()
-->currentLog();           // get the AttemptLog for the current attempt
-->logs();                 // get the AttemptLogs for all of the attempts 
-->reset();                // reset the backoff to its initial state, ready to start again
 ```
 
 
 
 ## Usage
 
-### Use Backoff to Manage the Retry Process
+Start by picking an [algorithm](#backoff-algorithms) to use (which calculates the delay durations), [configure it as needed](#configuration), and then use it to run your work by passing a closure to `->attempt()`.
 
-Backoff can manage the retry process for you. It retries when exceptions occur (and/or when invalid results are returned [when configured to](#managing-invalid-return-values)), so you don't need to worry about the logic. Just pass your callable `$action` to `->attempt()`, and it will handle the rest.
-
-Start by picking a [backoff algorithm](#backoff-algorithms) to use, [configure it as needed](#configuration), and then use it to run your work.
+By default, your closure will be retried [when exceptions occur](#managing-exceptions). The value returned by your closure will be returned when it succeeds.
 
 ```php
 use CodeDistortion\Backoff\Backoff;
@@ -335,169 +323,29 @@ $action = fn() => …; // do some work
 $result = Backoff::exponential(1)->maxDelay(30)->maxAttempts(10)->attempt($action);
 ```
 
-See below for more [configuration options](#configuration).
-
-By default, the final exception is rethrown, but you can pass a default value to be returned instead if all attempts fail.
+When exceptions occur, the final exception is rethrown. However, you can pass a default value to be returned instead if all attempts fail.
 
 ```php
 $result = Backoff::exponential(1)->maxDelay(30)->maxAttempts(10)->attempt($action, $default);
 ```
 
-See below for more details about [managing exceptions](#managing-exceptions) and ["invalid" return values](#managing-invalid-return-values).
-
-
-
-### Or Manage the Retry Loop Yourself
-
-If you'd like more control over the process, you can manage the retry loop yourself. This involves setting up a loop and using Backoff to handle the delays.
-
-> This option is more detailed to implement, and probably doesn't offer any more flexibility than [the other option](#use-backoff-to-manage-the-retry-process), so I've hidden the details below. But by all means, have a look and use them if they suit your needs.
-
-<details><summary>(Click here for loop examples)</summary>
-<p>
-
-> ***Note:***
->
-> - If you'd like Backoff to catch *particular* exceptions, you can use [->retryExceptions(…)](#managing-exceptions). This lets you specify which exceptions to retry, or specify a callback to make the decision.
-> - If you'd like to selectively retry based on particular *return values*, you can use [->retryWhen(…)](#retry-when) or [->retryUntil(…)](#retry-until). These let you specify values to check for, or specify a callback to make the decision.
-> - If you'd like to perform tasks before each retry delay (like logging), you could consider using [->exceptionCallback(…)](#exception-callback) or [->invalidResultCallback(…)](#invalid-result-callback).
-
-
-
-#### Basic Loop
-
-Start by picking a [backoff algorithm](#backoff-algorithms) to use, [configure it as needed](#configuration). Then incorporate it into your loop.
-
-`$backoff->step()` is the method you will call to trigger the backoff logic. It will wait the appropriate amount of time based on how many attempts have been made, and return `false` when the attempts have been exhausted.
-
-```php
-use CodeDistortion\Backoff\Backoff;
-
-// choose a backoff algorithm and configure it as needed
-$backoff = Backoff::exponential(1)->maxDelay(30)->maxAttempts(10);
-
-// then use it in your loop
-do {
-    $success = …; // do some work
-} while ((!$success) && ($backoff->step()));
-```
-
-If you'd like to attempt your action *zero* or more times, you can place `$backoff->step()` at the *entrance* of your loop, having called `->runsAtStartOfLoop()` beforehand.
-
-This lets Backoff know, so it doesn't perform the delay and count the attempt the first time.
-
-```php
-$maxAttempts = …; // possibly 0
-
-// specify that $backoff->step() will be called at the entrance to your loop
-$backoff = Backoff::exponential(1)->maxDelay(30)->maxAttempts($maxAttempts)->runsAtStartOfLoop();
-
-$success = false;
-while ((!$success) && ($backoff->step())) {
-    $success = …; // do some work
-};
-```
-
-
-
-#### Catching Exceptions in Your Loop
-
-```php
-$maxAttempts = …; // possibly 0
-$backoff = Backoff::exponential(1)->maxDelay(30)->maxAttempts($maxAttempts)->runsAtStartOfLoop();
-
-$success = false;
-while ((!$success) && ($backoff->step())) {
-    try {
-        $success = …; // do some work
-    } catch (MyException $e) {
-        // handle the exception
-    }
-};
-```
-
-
-
-#### Deconstruction of the Backoff Logic
-
-Behind the scenes, `->step()` calls `->calculate()` to determine the delay, and then `->sleep()` to wait for that delay. You can call these yourself directly instead.
-
-Both `->calculate()` and `->sleep()` both return `false` when the attempts have been exhausted.
-
-`->sleep()` will only sleep when there is a delay greater than zero to be made.
-
-```php
-$backoff = Backoff::exponential(1)->maxDelay(30)->maxAttempts(10)->runsAtStartOfLoop();
-
-do {
-    // calculate the next delay
-    if (!$backoff->calculate()) {
-        break;
-    }
-    // sleep for the calculated delay period
-    // (will skip the first sleep because of ->runsAtStartOfLoop())
-    $backoff->sleep();
-
-    $success = …; // do some work
-
-} while (!$success);
-```
-
-You could choose for Backoff to calculate the delay, and then perform the sleep yourself.
-
-```php
-$backoff = Backoff::exponential(1)->maxDelay(30)->maxAttempts(10)->runsAtStartOfLoop();
-
-do {
-    if (!$backoff->calculate()) {
-        break;
-    }
-    $usleep = $backoff->getDelayInUs();
-    if ($usleep > 0) {
-        usleep((int) $usleep);
-    }
-
-    $success = …; // do some work
-
-} while (!$success);
-```
-
-
-
-#### Helpers
- 
-There are some helpers you can use to help you manage the process.
-
-```php
-$backoff->currentAttemptNumber() // get the current attempt number
-$backoff->isFirstAttempt()       // check if the first attempt is currently being made
-$backoff->isLastAttempt()        // check if the last attempt is currently being made (however it may run indefinitely)
-$backoff->hasStopped()           // check if the attempts have been exhausted - this is triggered by ->calculate()
-$backoff->currentLog()           // get the AttemptLog for the current attempt *
-$backoff->logs()                 // get the AttemptLogs for all of the attempts *
-$backoff->reset()                // reset the backoff to its initial state, ready to start again
-```
-
-\* See below for [information about logging](#logging).
-
-</p>
-</details>
+> ***Note:*** If you pass a *callable* default value, it will be called when the default is needed. *Its* return value will be returned.
 
 
 
 ## Backoff Algorithms
 
-Backoff algorithms are used to determine how long to wait between attempts. They usually increase the delay between attempts in some way.
+Backoff algorithms are used to calculate how long to wait for between attempts. They usually increase the delay between attempts in some way.
 
-They generate the "base" delay for each attempt. [Jitter](#jitter) can be applied afterwards to make them less predictable.
+> ***Note:*** The actual delays will vary because [Jitter](#jitter) is applied to the base-delays the algorithms generate. This is designed to make the retries less predictable.
 
-By default, delays are in seconds. However, each algorithm has a millisecond and microsecond option.
+By default, delays are in seconds. However, each algorithm has a millisecond and microsecond variation.
 
 > ***Note:*** Delays in any unit-of-measure can have decimal places, including seconds.
 
 > ***Note:*** Microseconds are probably small enough that the numbers start to become inaccurate because of PHP overheads when sleeping. For example, on my computer, while code can run quicker than a microsecond, running usleep(1) to sleep for 1 microsecond actually takes about 55 microseconds.
 
-Several backoff algorithms have been included to choose from, and you can also [create your own](#custom-backoff-algorithm-class)…
+A range of backoff algorithms have been included to choose from, and you can also [create your own](#custom-backoff-algorithm-class)…
 
 
 
@@ -585,21 +433,18 @@ The Fibonacci backoff algorithm increases waiting period by following a Fibonacc
 ```php
 // Backoff::fibonacci($initialDelay, $includeFirst = false)
 
-Backoff::fibonacci(1)->attempt($action); // 1, 2, 3, 5, 8, 13, 21, 34, 55, 89…
-Backoff::fibonacci(5)->attempt($action); // 5, 10, 15, 25, 40, 65, 105, 170, 275, 445…
+Backoff::fibonacci(1)->attempt($action); // 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89…
+Backoff::fibonacci(5)->attempt($action); // 5, 5, 10, 15, 25, 40, 65, 105, 170, 275…
 
 Backoff::fibonacciMs(1)->attempt($action); // in milliseconds
 Backoff::fibonacciUs(1)->attempt($action); // in microseconds
 ```
 
-By default, the first value in the Fibonacci sequence is skipped. This is so the same delay isn't repeated.
-
-If you'd like to include it, you can pass `true` as the second parameter.
+Seeing as the first and second delays in a Fibonacci sequence are the same, you can choose to skip the first delay if you like.
 
 ```php
 Backoff::fibonacci(1, false)->attempt($action); // 1, 2, 3, 5, 8, 13, 21, 34, 55, 89…
-Backoff::fibonacci(1, true)->attempt($action); // 1, 1, 2, 3, 5, 8, 13, 21, 34, 55…
-Backoff::fibonacci(5, true)->attempt($action); // 5, 5, 10, 15, 25, 40, 65, 105, 170, 275…
+Backoff::fibonacci(5, false)->attempt($action); // 5, 10, 15, 25, 40, 65, 105, 170, 275, 445…
 ```
 
 
@@ -649,7 +494,7 @@ Backoff::randomUs(2, 5)->attempt($action); // in microseconds
 
 The sequence backoff algorithm lets you specify the particular delays to use.
 
-An optional fixed delay can be used to continue on with, after the sequence finishes. Otherwise, the attempts will stop when the delays have been exhausted.
+An optional fixed delay can be used to continue with, after the sequence finishes. Otherwise, the attempts will stop when the sequence has been exhausted.
 
 > ***Note:*** You'll need to make sure the delay values you specify match the unit-of-measure being used.
 
@@ -658,8 +503,8 @@ An optional fixed delay can be used to continue on with, after the sequence fini
 ```php
 // Backoff::sequence($delays, $continuation = null)
 
-Backoff::sequence([1, 1.25, 1.5, 2, 3])->attempt($action); // 1, 1.25, 1.5, 2, 3
-Backoff::sequence([1, 1.25, 1.5, 2, 3], 5)->attempt($action); // 1, 1.25, 1.5, 2, 3, 5, 5, 5, 5, 5…
+Backoff::sequence([1, 1.25, 1.5, 2, 3])->attempt($action);       // 1, 1.25, 1.5, 2, 3
+Backoff::sequence([1, 1.25, 1.5, 2, 3], true)->attempt($action); // 1, 1.25, 1.5, 2, 3, 3, 3, 3, 3…
 
 Backoff::sequenceMs([1, 1.25, 1.5, 2, 3])->attempt($action); // in milliseconds
 Backoff::sequenceUs([1, 1.25, 1.5, 2, 3])->attempt($action); // in microseconds
@@ -675,12 +520,12 @@ The callback backoff algorithm lets you specify a callback that chooses the wait
 
 Your callback is expected to return an `int` or `float` representing the delay, or `null` to indicate that the attempts should stop.
 
-`Logic: $delay = $callback($retryNumber)`
+`Logic: $delay = $callback($retryNumber, $prevBaseDelay)`
 
 ```php
 // $callback = function (int $retryNumber, int|float|null $prevBaseDelay): int|float|null …
 
-Backoff::callback($callback)->attempt($action); // $callback(1, $prev), $callback(2, $prev), $callback(3, $prev)… 
+Backoff::callback($callback)->attempt($action); // $callback(1, $prev), $callback(2, $prev), $callback(3, $prev)…
 
 Backoff::callbackMs($callback)->attempt($action); // in milliseconds
 Backoff::callbackUs($callback)->attempt($action); // in microseconds
@@ -689,7 +534,7 @@ Backoff::callbackUs($callback)->attempt($action); // in microseconds
 > ***Note:*** You'll need to make sure the delay values you return match the unit-of-measure being used.
 
 > ***Note:*** If you [use `->immediateFirstRetry()`](#immediate-first-retry), the first retry will be made before delays from your callback are used.
-> 
+>
 > In this case, `$retryNumber` will start with 1, but it will really be for the second attempt onwards.
 
 
@@ -708,16 +553,16 @@ class MyBackoffAlgorithm extends BaseBackoffAlgorithm implements BackoffAlgorith
 {
     /** @var boolean Whether jitter may be applied to the delays calculated by this algorithm. */
     public bool $jitterMayBeApplied = true;
-    
+
     public function __construct(
         // e.g. private int|float $initialDelay,
         // … and any other parameters you need
     ) {
     }
-    
+
     public function calculateBaseDelay(int $retryNumber, int|float|null $prevBaseDelay): int|float|null
     {
-        return …; // your logic here 
+        return …; // your logic here
     }
 }
 ```
@@ -743,24 +588,24 @@ Backoff::customUs($algorithm)->attempt($action); // in microseconds
 
 ### Noop Backoff
 
-The no-op backoff algorithm doesn't wait at all, retries are attempted straight away.
+The "no-op" backoff algorithm is a utility algorithm that doesn't wait at all, retries are attempted straight away.
 
-This might be useful for testing purposes. See [Backoff and Test Suites](#backoff-and-test-suites) for more options when running tests.
+This might be useful for testing purposes. See [Backoff and Test Suites](#working-with-test-suites) for more options when running tests.
 
 ```php
-Backoff::noop()->attempt($action); // 0, 0, 0, 0, 0… 
+Backoff::noop()->attempt($action); // 0, 0, 0, 0, 0…
 ```
 
 
 
 ### No Backoff
 
-The "no backoff" algorithm doesn't allow retries at all.
+The "no backoff" algorithm is a utility algorithm that doesn't allow retries at all. Only the first attempt will be made.
 
-This might be useful for testing purposes. See [Backoff and Test Suites](#backoff-and-test-suites) for more options when running tests.
+This might be useful for testing purposes. See [Backoff and Test Suites](#working-with-test-suites) for more options when running tests.
 
 ```php
-Backoff::none()->attempt($action); // (no retries) 
+Backoff::none()->attempt($action); // (no retries)
 ```
 
 
@@ -770,8 +615,6 @@ Backoff::none()->attempt($action); // (no retries)
 ### Max Attempts
 
 By default, Backoff will retry forever. To stop this from happening, you can specify the maximum number of attempts allowed.
-
-Note that the number of *attempts* will be one more than the number of *retries* that occur.
 
 ```php
 Backoff::exponential(1)
@@ -785,13 +628,9 @@ Backoff::exponential(1)
 
 #### Max-Delay
 
-You can specify the maximum length each base-delay can be. This is useful for preventing the delays from becoming too long.
+You can specify the maximum length each base-delay (which is the delay before [jitter](#jitter) is applied) can be. This is useful for preventing the delays from becoming too long.
 
 > ***Note:*** You'll need to make sure the max-delay you specify matches the unit-of-measure being used.
-
-> ***Note:*** This is the maximum *base* delay. [Jitter](#jitter) may still make the delay longer (if it's [allowed to go over 100%](#custom-jitter-range)).
-> 
-> The idea is that this will stop multiple clients from synchronising after reaching the max-delay. This should be ok because it's still largely what you want.
 
 ```php
 Backoff::exponential(10)
@@ -812,17 +651,19 @@ Backoff::exponential(10)
     ->attempt($action);
 ```
 
-This won't affect the maximum attempt limit. So if you set a maximum of 5 attempts, and you use `->immediateFirstRetry()`, there will be up to 6 attempts in total.
+This won't affect the maximum attempt limit. So if you set a maximum of 5 attempts, and you use `->immediateFirstRetry()`, there will still be up to 5 attempts in total.
 
 
 
 ### Jitter
 
-Having a backoff algorithm probably isn't enough on its own to prevent a large number of clients retrying at the same moments in time. Jitter is used to help mitigate this by spreading them out.
+Having a backoff algorithm probably isn't enough on its own to prevent a stampede when there are a large number of clients retrying at the same moments in time. Jitter is used to help mitigate this by adding a random factor to spread them out.
 
 Jitter is the concept of making random adjustments to the delays generated by the backoff algorithm.
 
-For example, if the backoff algorithm generates a delay of 100ms, jitter could adjust this to be somewhere between 75ms and 125ms. The actual range is determined by the type of jitter used.
+For example, if the backoff algorithm generates a delay of 100ms, jitter adjusts this to be somewhere between say, 75ms and 125ms. The actual range is determined by the type of jitter used.
+
+> This library applies [Full Jitter](#full-jitter) by default. You can use [No Jitter](#no-jitter) if you'd like to turn jitter off.
 
 > The article [Exponential Backoff And Jitter](https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/) by Marc Brooker at AWS does a good job of explaining what jitter is, and the reason for its use.
 
@@ -830,9 +671,9 @@ For example, if the backoff algorithm generates a delay of 100ms, jitter could a
 
 #### Full Jitter
 
-Full Jitter applies a random adjustment to the delay, within the range of 0 and the *full delay*. That is, between 0% and 100% of the delay.
+Full Jitter applies a random adjustment to the delay, within the range of 0 and the *full delay*. That is, between 0% and 100% of the base-delay.
 
-This is the type of jitter that is used by default.
+> ***Note:*** This is the type of jitter that is used by default.
 
 `$delay = rand(0, $delay)`
 
@@ -842,13 +683,11 @@ Backoff::exponential(1)
     ->attempt($action);
 ```
 
-> ***Note:*** This jitter type is applied by default.
-
 
 
 #### Equal Jitter
 
-Equal Jitter applies a random adjustment to the delay, within the range of *half* and the *full delay*. That is, between 50% and 100% of the delay.
+Equal Jitter applies a random adjustment to the delay, within the range of *half* and the *full delay*. That is, between 50% and 100% of the base-delay.
 
 `$delay = rand($delay / 2, $delay)`
 
@@ -876,7 +715,7 @@ Backoff::exponential(1)
 
 #### Jitter Callback
 
-Jitter callback lets you specify a callback that applies jitter to the delay.
+Jitter callback lets you specify a callback that applies jitter to the base-delay.
 
 Your callback is expected to return an `int` or `float` representing the updated delay.
 
@@ -910,10 +749,10 @@ class MyJitter extends BaseJitter implements JitterInterface
         // … any configuration parameters you need
     ) {
     }
-    
+
     public function apply(int|float $delay, int $retryNumber): int|float
     {
-        return …; // your logic here 
+        return …; // your logic here
     }
 }
 ```
@@ -924,7 +763,7 @@ You can then use your custom jitter class like this:
 $jitter = new MyJitter(…);
 
 Backoff::exponential(1)
-    ->customJitter($jitter) // <<<
+    ->customJitter($jitter) // <<< return the base-delay with no adjustment
     ->attempt($action);
 ```
 
@@ -932,7 +771,7 @@ Backoff::exponential(1)
 
 #### No Jitter
 
-Jitter can be turned off by calling `->noJitter()`.
+[Full Jitter](#full-jitter) is applied by default, however you can turn it off by calling `->noJitter()`.
 
 ```php
 Backoff::exponential(1)
@@ -940,13 +779,13 @@ Backoff::exponential(1)
     ->attempt($action);
 ```
 
+When disabled, the base-delays generated by the [backoff algorithm](#backoff-algorithms) will be used as-is (except for [max-delay](#max-delay) being applied).
+
 
 
 ## Managing Exceptions
 
 By default, Backoff will retry whenever an exception occurs. You can customise this behaviour using the following methods.
-
-> ***Note:*** These methods only apply when you use the [`->attempt()` method to manage the retry process](#use-backoff-to-manage-the-retry-process).
 
 
 
@@ -960,7 +799,7 @@ Backoff::exponential(1)
     ->attempt($action);
 ```
 
-By default, when all attempts have failed (e.g. when `->maxAttempts(…)` is used), the final exception is rethrown afterwards. 
+By default, when all attempts have failed (e.g. when `->maxAttempts(…)` is used), the final exception is rethrown afterwards.
 
 You can pass a default value to return instead when that happens.
 
@@ -970,7 +809,7 @@ Backoff::exponential(1)
     ->attempt($action);
 ```
 
-> ***Note:*** If you pass a *callable* default value, it will be called when the default is needed. Its return value will be returned.
+> ***Note:*** If you pass a *callable* default value, it will be called when the default is needed. *Its* return value will be returned.
 
 
 
@@ -993,7 +832,9 @@ Backoff::exponential(1)
     ->attempt($action);
 ```
 
-You can pass a callback that chooses whether to retry or not. The exception will be passed to your callback, and it should return `true` to try again, or `false` to end.
+> ***Note:*** If you pass a *callable* default value, it will be called when the default is needed. *Its* return value will be returned.
+
+You can also pass a callback that chooses whether to retry or not. The exception will be passed to your callback, and it should return `true` to try again, or `false` to end.
 
 ```php
 $callback = fn(Throwable $e, AttemptLog $log): bool => …; // your logic here
@@ -1019,7 +860,7 @@ Backoff::exponential(1)
     ->attempt($action);
 ```
 
-Normally, the exception will be rethrown. But you can pass a `$default` value to return instead.
+Normally, the exception will be rethrown. However, you can pass a `$default` value to return instead.
 
 ```php
 Backoff::exponential(1)
@@ -1027,13 +868,13 @@ Backoff::exponential(1)
     ->attempt($action);
 ```
 
+> ***Note:*** If you pass a *callable* default value, it will be called when the default is needed. *Its* return value will be returned.
+
 
 
 ## Managing "Invalid" Return Values
 
 By default, Backoff will *not* retry based on the value returned by your `$action` callback. However, you can choose to if you like.
-
-> ***Note:*** These methods apply when you use the [`->attempt()` method to manage the retry process](#use-backoff-to-manage-the-retry-process).
 
 
 
@@ -1051,7 +892,7 @@ Backoff::exponential(1)
     ->attempt($action);
 ```
 
-You can also pass a callback that chooses whether to retry or not. Your callback should return `true` to try again, or `false` to end.
+You can also pass a callback that chooses whether to retry or not. Your callback should return `true` to try again, or `false` to stop.
 
 > ***Note:*** `$strict` has no effect when using a callback.
 
@@ -1063,7 +904,7 @@ Backoff::exponential(1)
     ->attempt($action);
 ```
 
-> ***Note:*** If you pass a *callable* default value, it will be called when the default is needed. Its return value will be returned.
+> ***Note:*** If you pass a *callable* default value, it will be called when the default is needed. *Its* return value will be returned.
 
 
 
@@ -1079,7 +920,7 @@ Backoff::exponential(1)
 
 Similarly, `$strict` allows you to compare the returned value to `$value` using strict comparison (`===`).
 
-You can also specify a callback that chooses whether to retry or not. Contrasting with `->retryWhen()` above, your callback should return `false` to try again, or `true` to end.
+You can also specify a callback that chooses whether to retry or not. Contrasting with `->retryWhen()` above, your callback should return `false` to try again, or `true` to stop.
 
 > ***Note:*** `$strict` has no effect when using a callback.
 
@@ -1091,28 +932,26 @@ Backoff::exponential(1)
     ->attempt($action);
 ```
 
-> ***Note:*** If you pass a *callable* default value, it will be called when the default is needed. Its return value will be returned.
+> ***Note:*** You can't specify a default value for *retry until*, but you can pass one to `->attempt($action, $default)`.
 
 
 
 ## Callbacks
 
-Several callback options are available for you to trigger code at different points in the retry lifecycle.
+Several callback options are available to trigger your code at different points in the retry lifecycle.
 
 Backoff passes an `AttemptLog` object (or an array of them, depending on the callback) to these callbacks. See below for information about the [AttemptLog class](#logging).
-
-> ***Note:*** These methods only apply when you use the [`->attempt()` method to manage the retry process](#use-backoff-to-manage-the-retry-process).
 
 
 
 ### Exception Callback
 
-If you'd like to run some code *each time* an exception occurs, you can pass a callback to `->exceptionCallback(…)`.
+If you'd like to run some code *every time* an exception occurs, you can pass a callback to `->exceptionCallback(…)`.
 
-It doesn't matter whether the exception is caught using [->retryExceptions(…)](#retry-when-particular-exceptions-occur). These callbacks will be called regardless of a retry being made or not.
+It doesn't matter whether the exception is caught using [->retryExceptions(…)](#retry-when-particular-exceptions-occur). These callbacks will be called regardless of whether a retry will be made or not.
 
 ```php
-$callback = fn(Throwable $e, AttemptLog $log, bool $willRetry): void => …; // do something here
+$callback = fn(Throwable $e, AttemptLog $log, bool $willRetry) => …; // do something here
 
 Backoff::exponential(1)
     ->exceptionCallback($callback) // <<<
@@ -1126,7 +965,7 @@ Backoff::exponential(1)
 If you'd like to run some code *each time* an invalid result is returned, you can pass a callback to `->invalidResultCallback(…)`.
 
 ```php
-$callback = fn(mixed $result, AttemptLog $log): void => …; // do something here
+$callback = fn(mixed $result, AttemptLog $log, bool $willRetry) => …; // do something here
 
 Backoff::exponential(1)
     ->invalidResultCallback($callback) // <<<
@@ -1143,7 +982,7 @@ An array of `AttemptLog` objects representing the attempts that were made will b
 
 ```php
 /** @var AttemptLog[] $logs */
-$callback = fn(array $logs): void => …; // do something here
+$callback = fn(array $logs) => …; // do something here
 
 Backoff::exponential(1)
     ->successCallback($callback) // <<<
@@ -1162,7 +1001,7 @@ An array of `AttemptLog` objects representing the attempts that were made will b
 
 ```php
 /** @var AttemptLog[] $logs */
-$callback = fn(array $logs): void => …; // do something here
+$callback = fn(array $logs) => …; // do something here
 
 Backoff::exponential(1)
     ->failureCallback($callback) // <<<
@@ -1181,7 +1020,7 @@ An array of `AttemptLog` objects representing the attempts that were made will b
 
 ```php
 /** @var AttemptLog[] $logs */
-$callback = fn(array $logs): void => …; // do something here
+$callback = fn(array $logs) => …; // do something here
 
 Backoff::exponential(1)
     ->finallyCallback($callback) // <<<
@@ -1194,28 +1033,11 @@ Backoff::exponential(1)
 
 Backoff collects some basic information about each attempt as they happen.
 
-This history is made up of [`AttemptLog` objects](#the-attemptlog-class), which you can use if you'd like to perform logging or analysis yourself.
+This history is made up of [`AttemptLog` objects](#the-attemptlog-class) which you can access objects via [callbacks](#callbacks).
 
-When using `->attempt()`, you can access them via [callbacks](#callbacks).
+These AttemptLog objects provide the information you need to log.
 
-If you're [managing the loop yourself](#or-manage-the-retry-loop-yourself), add `->startOfAttempt()` and `->endOfAttempt()` around your work so the logs are built. You can then access:
-- the current `AttemptLog` by calling `$backoff->currentLog()`,
-- and the full history (so far) using `$backoff->logs()`.
-
-```php
-$backoff = Backoff::exponential(1);
-do {
-    $backoff->startOfAttempt(); // <<<
-    $success = …; // do some work
-    $backoff->endOfAttempt(); // <<<
-    
-    $log = $backoff->currentLog(); // returns the current AttemptLog
-    // … perform some logging here based upon $log
-    
-} while ((!$success) && ($backoff->step()));
-
-$logs = $backoff->logs(); // returns all the AttemptLogs in an array
-```
+> ***Note:*** If you [manage the looping process yourself](#managing-the-retry-loop-yourself), there are some [extra ways to interact with these logs](#working-with-logs).
 
 
 
@@ -1223,9 +1045,7 @@ $logs = $backoff->logs(); // returns all the AttemptLogs in an array
 
 The `AttemptLog` class contains basic information about each attempt that has happened.
 
-They can be accessed via [callbacks](#callbacks), and when [managing the retry loop yourself](#logging).
-
-`AttemptLog` contains the following methods:
+They contain the following methods:
 
 ```php
 $log->attemptNumber(); // the attempt being made (1, 2, 3…)
@@ -1235,7 +1055,7 @@ $log->retryNumber();   // the retry being made (0, 1, 2…)
 // (returns null for unlimited attempts)
 // note: it's possible for a backoff algorithm to return null
 // so the attempts finish early. This won't be reflected here
-$log->maxAttempts();   
+$log->maxAttempts();
 
 $log->firstAttemptOccurredAt(); // when the first attempt started
 $log->thisAttemptOccurredAt();  // when the current attempt started
@@ -1281,7 +1101,7 @@ $log->unitType();
 
 
 
-## Backoff and Test Suites
+## Working With Test Suites
 
 When running your test-suite, you might want to disable the backoff delays, or stop retries altogether.
 
@@ -1303,9 +1123,9 @@ Backoff::exponential(1)
     ->attempt($action);
 ```
 
-When `$runningTests` is `true`, this is:
-- equivalent to setting `->maxDelay(0)`, and
-- is largely equivalent to using the `Backoff::noop()` backoff 4.
+> When `$runningTests` is `true`, this is:
+> - equivalent to setting `->maxDelay(0)`, and
+> - is largely equivalent to using the `Backoff::noop()` backoff.
 
 
 
@@ -1323,15 +1143,192 @@ $backoff = Backoff::exponential(1)
     ->attempt($action);
 ```
 
-When `$runningTests` is `true`, this is equivalent to:
-- setting `->maxAttempts(1)`, or
-- using the `Backoff::none()` backoff algorithm.
+> When `$runningTests` is `true`, this is equivalent to:
+> - setting `->maxAttempts(1)`, or
+> - using the `Backoff::none()` backoff algorithm.
+
+
+
+## Managing the Retry Loop Yourself
+
+If you'd like more control over the process, you can manage the retry loop yourself. This involves setting up a loop, and using Backoff to handle the delays each iteration.
+
+Please note that by doing this, you're skipping the part of Backoff that manages the loop and retry process, essentially handling them yourself. This means that you won't be able to use Backoff's functionality to catch and retry because of [exceptions](#managing-exceptions) or when [certain values are returned](#managing-invalid-return-values), or trigger [callbacks](#callbacks). You'll need to manage these yourself.
+
+If your aim is to do one of the following, you could use one of the already available options:
+
+> - [Catch and retry exceptions](#managing-exceptions) - If you'd like Backoff to catch *particular* exceptions, you can use [->retryExceptions(…)](#managing-exceptions). This lets you specify which exceptions to retry, or specify a callback to make the decision.
+> - [Retry based on return values](#managing-invalid-return-values) - If you'd like to selectively retry based on particular *return values*, you can use [->retryWhen(…)](#retry-when) or [->retryUntil(…)](#retry-until). These let you specify values to check for, or specify a callback to make the decision.
+> - [Trigger callbacks](#callbacks) - If you'd like to perform tasks in certain situations (like logging before each retry delay), you could consider using the callback options such as [->exceptionCallback(…)](#exception-callback) or [->invalidResultCallback(…)](#invalid-result-callback).
+
+
+
+### The Basic Loop
+
+Start by picking a [backoff algorithm](#backoff-algorithms) and [configure it](#configuration) as you normally would. Then incorporate it into your loop.
+
+Call `->step()` to proceed to the next attempt. This sleeps for the appropriate amount of time, and returns `false` when the attempts have been exhausted.
+
+```php
+use CodeDistortion\Backoff\Backoff;
+
+// choose a backoff algorithm and configure it as needed
+$backoff = Backoff::exponential(1)->maxDelay(30)->maxAttempts(10);
+
+// then use it in your loop
+do {
+    $success = …; // do some work
+} while ((!$success) && ($backoff->step())); // <<<
+```
+
+If you'd like to attempt your action *zero* or more times, you can place `$backoff->step()` at the *entrance* of your loop, having called `->runsAtStartOfLoop()` beforehand.
+
+This lets Backoff know, so it doesn't perform the delay and count the attempt the first time.
+
+```php
+$maxAttempts = …; // possibly 0
+
+// specify that $backoff->step() will be called at the entrance to your loop
+$backoff = Backoff::exponential(1)->maxDelay(30)->maxAttempts($maxAttempts)->runsAtStartOfLoop(); // <<<
+
+$success = false;
+while ((!$success) && ($backoff->step())) { // <<<
+    $success = …; // do some work
+};
+```
+
+
+
+### Catching Exceptions in Your Loop
+
+Add a try-catch block to handle exceptions inside your loop, and handle the exception as you see fit.
+
+```php
+$backoff = Backoff::exponential(1)->maxDelay(30)->maxAttempts(10)->runsAtStartOfLoop();
+
+$success = false;
+while ((!$success) && ($backoff->step())) {
+    try {
+        $success = …; // do some work
+    } catch (MyException $e) {
+        // handle the exception
+    }
+};
+```
+
+
+
+### Deconstructing the Backoff Logic
+
+You can separate the process into its parts if you'd like to have even more control over the process.
+
+`->step()` normally performs the sleep, but you can call `->step(false)` to skip the sleep, and then perform the sleep separately by calling `->sleep()`.
+
+```php
+$backoff = Backoff::exponential(1)->maxDelay(30)->maxAttempts(10)->runsAtStartOfLoop();
+
+$success = false;
+while ((!$success) && ($backoff->step(false))) { // <<<
+
+    // there won't be a first delay because of ->runsAtStartOfLoop()
+    $backoff->sleep(); // <<<
+
+    $success = …; // do some work
+};
+```
+
+You can also perform the sleep yourself (instead of calling `->sleep()`).
+
+Call `->getDelayInSeconds()`, `->getDelayInMs()`, or `->getDelayInUs()` to retrieve the delay in the unit-of-measure you need.
+
+```php
+$backoff = Backoff::exponential(1)->maxDelay(30)->maxAttempts(10)->runsAtStartOfLoop();
+
+$success = false;
+while ((!$success) && ($backoff->step(false))) { // <<<
+
+    // there won't be a first delay because of ->runsAtStartOfLoop()
+    // remember the ->getDelayInXXX() methods may return a float
+    if ($delay = (int) $backoff->getDelayInUs()) { // <<<
+        // note that usleep() might not support delays larger than 1 second
+        // https://www.php.net/usleep
+        usleep($delay);
+    }
+
+    $success = …; // do some work
+};
+```
+
+
+
+### Working With Logs
+
+When managing the loop yourself, add `->startOfAttempt()` and `->endOfAttempt()` around your work so [the logs](#logging) are built. You can then access:
+- the current `AttemptLog` by calling `$backoff->currentLog()`,
+- and the full history (so far) using `$backoff->logs()`.
+
+```php
+$backoff = Backoff::exponential(1);
+do {
+    $backoff->startOfAttempt(); // <<<
+    $success = …; // do some work
+    $backoff->endOfAttempt(); // <<<
+
+    $log = $backoff->currentLog(); // returns the current AttemptLog
+    // … perform some logging here based upon $log
+
+} while ((!$success) && ($backoff->step()));
+
+$logs = $backoff->logs(); // returns all the AttemptLogs in an array
+```
+
+
+
+### Helpers When Managing The Loop Yourself
+
+There are the helpers you can use to help you manage the looping process.
+
+```php
+// tell backoff where you'll call ->step() (default = at the end of the loop)
+->runsAtStartOfLoop()      // specify that $backoff->step() will be called at the entrance to your loop
+->runsAtStartOfLoop(false) // specify that $backoff->step() will be called at the end of your loop (default), or
+->runsAtEndOfLoop()        // specify that $backoff->step() will be called at the end of your loop (default)
+
+// trigger the backoff logic - placed in the structure of your loop
+->step(); // calculate the delay and perform the sleep, returns false when the attempts are exhausted
+
+// if you'd like to separate the sleep from ->step()
+->step(false); // calculate delay without sleeping, returns false when the attempts are exhausted
+->sleep();     // sleep for the delay calculated by ->step(false)
+
+// if you'd like to perform the sleep yourself, call ->step(false) and then retrieve the delay
+->getDelay();          // get the delay in the current unit-of-measure (note: may contain decimals)
+->getDelayInSeconds(); // get the delay in seconds (note: may contain decimals)
+->getDelayInMs();      // get the delay in milliseconds (note: may contain decimals)
+->getDelayInUs();      // get the delay in microseconds (note: may contain decimals)
+->getUnitType();       // get the unit-of-measure being used (from CodeDistortion\Backoff\Settings::UNIT_XXX)
+
+// querying the state of the backoff
+->currentAttemptNumber(); // get the current attempt number
+->isFirstAttempt();       // check if the first attempt is currently being made
+->isLastAttempt();        // check if the last attempt is currently being made (however it may run indefinitely)
+->hasStopped();           // check if the attempts have been exhausted - this is the same value that ->step() returns
+
+// working with logs
+->startOfAttempt(); // start the attempt, so the log is built
+->endOfAttempt();   // end the attempt, so the log is built
+->currentLog();     // get the AttemptLog for the current attempt
+->logs();           // get all of the AttemptLogs (so far)
+
+// and finally
+->reset(); // reset the backoff to its initial state, ready to be re-used
+```
 
 
 
 ## Modelling
 
-If you would like to model the backoff process, you can use a `Backoff` instance to generate sets of delays without actually sleeping.
+If you would like to run modelling on the backoff process, you can use a `Backoff` instance to generate sets of delays without actually sleeping.
 
 ```php
 // generate delays in the current unit-of-measure
@@ -1362,14 +1359,14 @@ And just in case you need to check, you can retrieve the unit-of-measure being u
 $backoff->getUnitType();
 ```
 
-`null` values in the results indicate that the attempts have been exhausted.
+A `null` value in the results indicates that the attempts have been exhausted.
 
-> ***Note:*** These methods will generate the same values when you call them again. Backoff maintains this state because some backoff algorithms base their delays on previously generated delays (e.g. the [decorrelated backoff algorithm](#decorrelated-backoff) does this), so their values are important.
-> 
-> e.g. When generating `$backoff->simulateDelays(1, 20);` and then `$backoff->simulateDelays(21, 40);`, the second set may be based on the first set. 
-> 
+> ***Note:*** These methods will generate the same values when you call them again. Backoff maintains this state because some [backoff algorithms](#backoff-algorithms) base their delays on previously generated delays (e.g. the [decorrelated backoff algorithm](#decorrelated-backoff) does this), so their values are important.
+>
+> That is to say, when generating `$backoff->simulateDelays(1, 20);` and then `$backoff->simulateDelays(21, 40);`, the second set may be based on the first set.
+>
 > To generate a *new* set of delays, call `$backoff->reset()` first.
-> 
+>
 > ```php
 > $first = $backoff->simulateDelays(1, 20);
 > $second = $backoff->simulateDelays(1, 20);

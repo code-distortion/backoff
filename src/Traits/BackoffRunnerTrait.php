@@ -93,25 +93,19 @@ trait BackoffRunnerTrait
         }
 
         $this->hasExceptionDefault = false;
-        $this->exceptionDefault = true;
+        $this->exceptionDefault = null;
+
+        if (!is_array($this->retryExceptions)) {
+            $this->retryExceptions = [];
+        }
 
         $exceptions = Support::normaliseParameters([$exceptions], true);
+        $exceptions = ($exceptions === [])
+            ? [true] // retry all exceptions
+            : $exceptions;
 
-        // specifying no exceptions means to catch *all* exceptions
-        // (this overrides previously set exceptions)
-        if ($exceptions == []) {
-            $this->retryExceptions = [];
-            // true, so -any- exception is matched
-            $this->retryExceptions[] = new PossibleMatch(true, $defaultWasSpecified, $default);
-        } else {
-
-            $this->retryExceptions = is_array($this->retryExceptions)
-                ? $this->retryExceptions
-                : [];
-
-            foreach ($exceptions as $exception) {
-                $this->retryExceptions[] = new PossibleMatch($exception, $defaultWasSpecified, $default);
-            }
+        foreach ($exceptions as $exception) {
+            $this->retryExceptions[] = new PossibleMatch($exception, $defaultWasSpecified, $default);
         }
 
         return $this;
@@ -324,7 +318,7 @@ trait BackoffRunnerTrait
 
         try {
 
-            return $this->performAttempt($callback, $default, $defaultWasSpecifiedByCaller);
+            return $this->performAttempt($callback, $defaultWasSpecifiedByCaller, $default);
 
         } finally {
             // reset, and return certain values to the original state
@@ -337,12 +331,12 @@ trait BackoffRunnerTrait
      * Actually perform the attempt process.
      *
      * @param callable $callback                    The callback to run.
-     * @param mixed    $default                     The default value to return if all attempts fail.
      * @param boolean  $defaultWasSpecifiedByCaller Whether the default value was specified by the caller or not.
+     * @param mixed    $default                     The default value to return if all attempts fail.
      * @return mixed
      * @throws Throwable When the last exception should be rethrown.
      */
-    private function performAttempt(callable $callback, mixed $default, bool $defaultWasSpecifiedByCaller): mixed
+    private function performAttempt(callable $callback, bool $defaultWasSpecifiedByCaller, mixed $default): mixed
     {
         $overrideDefault = false;
         $overrideDefaultWith = null;
@@ -366,17 +360,18 @@ trait BackoffRunnerTrait
 
                 $wasSuccessful = true;
 
-                if (count($this->retryWhenResult)) {
+                if ((bool) count($this->retryWhenResult)) {
 
                     // check to make sure the $result doesn't match anything from $this->retryWhenResult
-                    if ($invalidResultMatch = $this->pickMatchingResult($result, $this->retryWhenResult)) {
+                    $invalidResultMatch = $this->pickMatchingResult($result, $this->retryWhenResult);
+                    if (!is_null($invalidResultMatch)) {
                         $wasSuccessful = false;
                         $overrideDefault = $invalidResultMatch->hasDefault();
                         $overrideDefaultWith = $invalidResultMatch->getDefault();
                     }
                 }
 
-                if (count($this->retryUntilResult)) {
+                if ((bool) count($this->retryUntilResult)) {
 
                     // or check to make sure the $result matches one of $this->isSuccessfulWhenResult
                     $validResultMatch = $this->pickMatchingResult($result, $this->retryUntilResult);
@@ -391,7 +386,7 @@ trait BackoffRunnerTrait
                 }
 
                 try {
-                    $this->callInvalidResultCallbacks($result);
+                    $this->callInvalidResultCallbacks($result, !$this->isLastAttempt());
                 } catch (Throwable $invalidResultCallbackException) {
                     // the exception is stored in $invalidResultCallbackException
                     // and re-thrown below, outside the main try/catch
@@ -406,7 +401,7 @@ trait BackoffRunnerTrait
                 // so we can ascertain if it specified a default value to return
                 $stop = false;
                 $exceptionMatch = $this->pickMatchingExceptionType($attemptException);
-                if ($exceptionMatch) {
+                if (!is_null($exceptionMatch)) {
                     $overrideDefault = $exceptionMatch->hasDefault();
                     $overrideDefaultWith = $exceptionMatch->getDefault();
                 } else {
@@ -430,7 +425,7 @@ trait BackoffRunnerTrait
         $this->callFailureCallbacks();
         $this->callFinallyCallbacks();
 
-        if ($invalidResultCallbackException) {
+        if (!is_null($invalidResultCallbackException)) {
             throw $invalidResultCallbackException;
         }
 
@@ -442,7 +437,7 @@ trait BackoffRunnerTrait
             return $this->resolveDefaultValue($default);
         }
 
-        if ($attemptException) {
+        if (!is_null($attemptException)) {
             throw $attemptException;
         }
 
@@ -498,33 +493,50 @@ trait BackoffRunnerTrait
             return null;
         }
 
-        // when not initialised by the caller, catch -any- exception (default behaviour)
-        if (!count($this->retryExceptions)) {
+        // when not initialised by the caller, catch -any- exception, with no default (default behaviour)
+        if (count($this->retryExceptions) == 0) {
             return new PossibleMatch(true);
         }
 
-        // the user specified particular exceptions to catch, or callback/s to check with
-        foreach ($this->retryExceptions as $possibleMatch) {
+        // loop through the possible matches in order so that the most specific match is used. In this order:
+        // - catch particular exception - with a default
+        // - catch all exceptions - with a default
+        // - catch particular exception - with NO default
+        // - catch all exceptions - with NO default
+        foreach ([true, false] as $hasDefault) {
+            foreach ([false, true] as $matchingAllExceptions) {
 
-            // true to match -any- exception
-            if ($possibleMatch->value === true) {
-                return $possibleMatch;
-            }
+                // check for the exceptions that have been specified
+                // or call callbacks to check if the exception should be retried
+                foreach ($this->retryExceptions as $possibleMatch) {
 
-            if (is_string($possibleMatch->value)) {
-                if ($e instanceof $possibleMatch->value) {
-                    return $possibleMatch;
-                }
-            } elseif (is_callable($possibleMatch->value)) {
+                    if ($possibleMatch->hasDefault() !== $hasDefault) {
+                        continue;
+                    }
+                    $matchesAllExceptions = ($possibleMatch->value === true);
+                    if ($matchesAllExceptions !== $matchingAllExceptions) {
+                        continue;
+                    }
 
-                $callable = $possibleMatch->value;
-                if ($callable($e, $this->currentLog())) {
-                    return $possibleMatch;
+                    if ($matchesAllExceptions) {
+                        return $possibleMatch;
+                    }
+
+                    if (is_string($possibleMatch->value)) {
+                        if ($e instanceof $possibleMatch->value) {
+                            return $possibleMatch;
+                        }
+                    } elseif (is_callable($possibleMatch->value)) {
+
+                        $callable = $possibleMatch->value;
+                        if ($callable($e, $this->currentLog())) {
+                            return $possibleMatch;
+                        }
+                    }
                 }
             }
         }
 
-        // no exceptions matched
         return null;
     }
 
@@ -549,13 +561,14 @@ trait BackoffRunnerTrait
     /**
      * Call the callbacks that should be called when an invalid result is returned.
      *
-     * @param mixed $result The result that was returned.
+     * @param mixed   $result    The result that was returned.
+     * @param boolean $willRetry Whether the action will be retried.
      * @return void
      */
-    private function callInvalidResultCallbacks(mixed $result): void
+    private function callInvalidResultCallbacks(mixed $result, bool $willRetry): void
     {
         foreach ($this->invalidResultCallbacks as $callback) {
-            $callback($result, $this->currentLog());
+            $callback($result, $this->currentLog(), $willRetry);
         }
     }
 

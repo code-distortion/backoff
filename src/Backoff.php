@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace CodeDistortion\Backoff;
 
-use CodeDistortion\Backoff\Traits\BackoffDecoratorTrait;
+use CodeDistortion\Backoff\Traits\BackoffStrategyDecoratorTrait;
 use CodeDistortion\Backoff\Traits\BackoffRunnerTrait;
 use CodeDistortion\Backoff\Traits\BackoffStrategyTrait;
 
@@ -15,7 +15,7 @@ use CodeDistortion\Backoff\Traits\BackoffStrategyTrait;
  */
 final class Backoff
 {
-    use BackoffDecoratorTrait;
+    use BackoffStrategyDecoratorTrait;
     use BackoffRunnerTrait;
     use BackoffStrategyTrait;
 }

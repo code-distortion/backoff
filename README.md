@@ -1,4 +1,4 @@
-# Backoff Already
+# Backoff
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/code-distortion/backoff.svg?style=flat-square)](https://packagist.org/packages/code-distortion/backoff)
 ![PHP Version](https://img.shields.io/badge/PHP-8.0%20to%208.3-blue?style=flat-square)
@@ -938,7 +938,7 @@ Backoff::exponential(1)
 
 ## Callbacks
 
-Several callback options are available to trigger your code at different points in the retry lifecycle.
+Several callback options are available to trigger your code at different points in the attempt lifecycle.
 
 Backoff passes an `AttemptLog` object (or an array of them, depending on the callback) to these callbacks. See below for information about the [AttemptLog class](#logging).
 
@@ -948,10 +948,19 @@ Backoff passes an `AttemptLog` object (or an array of them, depending on the cal
 
 If you'd like to run some code *every time* an exception occurs, you can pass a callback to `->exceptionCallback(…)`.
 
-It doesn't matter whether the exception is caught using [->retryExceptions(…)](#retry-when-particular-exceptions-occur). These callbacks will be called regardless of whether a retry will be made or not.
+It doesn't matter if the exception is caught using [->retryExceptions(…)](#retry-when-particular-exceptions-occur) or not. These callbacks will be called regardless of a retry being made.
 
 ```php
-$callback = fn(Throwable $e, AttemptLog $log, bool $willRetry) => …; // do something here
+$callback = fn(…) => …; // do something here
+
+// the callback can accept these parameters:
+//   $e              - called 'e' - the exception that was thrown
+//   $exception      - called 'exception' - the exception that was thrown
+//   Throwable $e    - of type 'Throwable', or any particular exception type you'd like to catch
+//   $willRetry      - called 'willRetry' - true if a retry will be made, false if not
+//   $log            - called 'log' - the current AttemptLog object
+//   AttemptLog $log - of type 'AttemptLog' - the current AttemptLog object
+//   $logs           - called 'logs' - an array of AttemptLog objects
 
 Backoff::exponential(1)
     ->exceptionCallback($callback) // <<<
@@ -965,7 +974,14 @@ Backoff::exponential(1)
 If you'd like to run some code *each time* an invalid result is returned, you can pass a callback to `->invalidResultCallback(…)`.
 
 ```php
-$callback = fn(mixed $result, AttemptLog $log, bool $willRetry) => …; // do something here
+$callback = fn(…) => …; // do something here
+
+// the callback can accept these parameters:
+//   $result         - called 'result' - the result that was returned
+//   $willRetry      - called 'willRetry' - true if a retry will be made, false if not
+//   $log            - called 'log' - the current AttemptLog object
+//   AttemptLog $log - of type 'AttemptLog' - the current AttemptLog object
+//   $logs           - called 'logs' - an array of AttemptLog objects
 
 Backoff::exponential(1)
     ->invalidResultCallback($callback) // <<<
@@ -981,8 +997,13 @@ You can specify a callback to be called once, after the attempt succeeds by call
 An array of `AttemptLog` objects representing the attempts that were made will be passed to your callback.
 
 ```php
-/** @var AttemptLog[] $logs */
-$callback = fn(array $logs) => …; // do something here
+$callback = fn(…) => …; // do something here
+
+// the callback can accept these parameters:
+//   $result         - called 'result' - the result that was returned
+//   $log            - called 'log' - the current AttemptLog object
+//   AttemptLog $log - of type 'AttemptLog' - the current AttemptLog object
+//   $logs           - called 'logs' - an array of AttemptLog objects
 
 Backoff::exponential(1)
     ->successCallback($callback) // <<<
@@ -1001,7 +1022,12 @@ An array of `AttemptLog` objects representing the attempts that were made will b
 
 ```php
 /** @var AttemptLog[] $logs */
-$callback = fn(array $logs) => …; // do something here
+$callback = fn(…) => …; // do something here
+
+// the callback can accept these parameters:
+//   $log            - called 'log' - the current AttemptLog object
+//   AttemptLog $log - of type 'AttemptLog' - the current AttemptLog object
+//   $logs           - called 'logs' - an array of AttemptLog objects
 
 Backoff::exponential(1)
     ->failureCallback($callback) // <<<
@@ -1020,7 +1046,12 @@ An array of `AttemptLog` objects representing the attempts that were made will b
 
 ```php
 /** @var AttemptLog[] $logs */
-$callback = fn(array $logs) => …; // do something here
+$callback = fn(…) => …; // do something here
+
+// the callback can accept these parameters:
+//   $log            - called 'log' - the current AttemptLog object
+//   AttemptLog $log - of type 'AttemptLog' - the current AttemptLog object
+//   $logs           - called 'logs' - an array of AttemptLog objects
 
 Backoff::exponential(1)
     ->finallyCallback($callback) // <<<

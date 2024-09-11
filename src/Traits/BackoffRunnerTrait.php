@@ -6,6 +6,7 @@ namespace CodeDistortion\Backoff\Traits;
 
 use CodeDistortion\Backoff\Support\PossibleMatch;
 use CodeDistortion\Backoff\Support\Support;
+use CodeDistortion\DICaller\DICaller;
 use Throwable;
 
 /**
@@ -380,7 +381,7 @@ trait BackoffRunnerTrait
 
                 // if the result was successful, return it
                 if ($wasSuccessful) {
-                    $this->callSuccessCallbacks();
+                    $this->callSuccessCallbacks($result);
                     $this->callFinallyCallbacks();
                     return $result;
                 }
@@ -554,7 +555,12 @@ trait BackoffRunnerTrait
     private function callExceptionCallbacks(Throwable $e, bool $willRetry): void
     {
         foreach ($this->exceptionCallbacks as $callback) {
-            $callback($e, $this->currentLog(), $willRetry);
+            $caller = DICaller::new($callback)
+                ->registerByName('exception', $e)
+                ->registerByName('e', $e)
+                ->registerByType($e)
+                ->registerByName('willRetry', $willRetry);
+            $this->callCallback($caller);
         }
     }
 
@@ -568,19 +574,25 @@ trait BackoffRunnerTrait
     private function callInvalidResultCallbacks(mixed $result, bool $willRetry): void
     {
         foreach ($this->invalidResultCallbacks as $callback) {
-            $callback($result, $this->currentLog(), $willRetry);
+            $caller = DICaller::new($callback)
+                ->registerByName('result', $result)
+                ->registerByName('willRetry', $willRetry);
+            $this->callCallback($caller);
         }
     }
 
     /**
      * Call the callbacks that should be called when the action completes successfully.
      *
+     * @param mixed $result The result that was returned.
      * @return void
      */
-    private function callSuccessCallbacks(): void
+    private function callSuccessCallbacks(mixed $result): void
     {
         foreach ($this->successCallbacks as $callback) {
-            $callback($this->logs());
+            $caller = DICaller::new($callback)
+                ->registerByName('result', $result);
+            $this->callCallback($caller);
         }
     }
 
@@ -592,7 +604,8 @@ trait BackoffRunnerTrait
     private function callFailureCallbacks(): void
     {
         foreach ($this->failureCallbacks as $callback) {
-            $callback($this->logs());
+            $caller = DICaller::new($callback);
+            $this->callCallback($caller);
         }
     }
 
@@ -604,8 +617,32 @@ trait BackoffRunnerTrait
     private function callFinallyCallbacks(): void
     {
         foreach ($this->finallyCallbacks as $callback) {
-            $callback($this->logs());
+            $caller = DICaller::new($callback);
+            $this->callCallback($caller);
         }
+    }
+
+
+
+
+
+    /**
+     * Call a callback provided it accepts a Throwable of the same type as the exception passed.
+     *
+     * @param DICaller $caller The DICaller that will call the callback.
+     * @return mixed
+     */
+    private function callCallback(DICaller $caller): mixed
+    {
+        $currentLog = $this->currentLog();
+        if ($currentLog) {
+            $caller->registerByName('log', $currentLog)
+                ->registerByType($currentLog);
+        }
+
+        $caller->registerByName('logs', $this->logs());
+
+        return $caller->callIfPossible();
     }
 
 

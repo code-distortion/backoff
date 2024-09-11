@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace CodeDistortion\Backoff\Exceptions;
 
 /**
- * The base Backoff exception class.
+ * The Backoff class for initialisation exceptions.
  */
 class BackoffInitialisationException extends BackoffException
 {

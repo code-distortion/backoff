@@ -820,7 +820,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
     }
 
     /**
-     * DataProvider for test_the_methods_that_require_the_strategy_not_to_have_started_yet().
+     * DataProvider for test_the_methods_that_require_the_strategy_not_to_have_started_yet.
      *
      * @return array<callable[]>
      */
@@ -1023,7 +1023,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
     }
 
     /**
-     * DataProvider for test_the_attempt_logs_that_are_passed_to_callbacks().
+     * DataProvider for test_the_attempt_logs_that_are_passed_to_callbacks.
      *
      * @return array<string,array<string,callable>>
      */

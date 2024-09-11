@@ -28,7 +28,7 @@
   failOnSkipped="true"
   failOnWarning="true"
   requireCoverageMetadata="false"
-  stopOnDefect="true"
+  stopOnDefect="false"
   stopOnDeprecation="true"
   stopOnError="true"
   stopOnFailure="true"
@@ -36,7 +36,7 @@
   stopOnNotice="true"
   stopOnRisky="true"
   stopOnSkipped="false"
-  stopOnWarning="true"
+  stopOnWarning="false"
 >
   <testsuites>
     <testsuite name="Unit">

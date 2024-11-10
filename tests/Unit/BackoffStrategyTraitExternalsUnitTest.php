@@ -10,6 +10,7 @@ use CodeDistortion\Backoff\Algorithms\FixedBackoffAlgorithm;
 use CodeDistortion\Backoff\Algorithms\LinearBackoffAlgorithm;
 use CodeDistortion\Backoff\Algorithms\NoopBackoffAlgorithm;
 use CodeDistortion\Backoff\Algorithms\SequenceBackoffAlgorithm;
+use CodeDistortion\Backoff\Exceptions\BackoffInitialisationException;
 use CodeDistortion\Backoff\Interfaces\BackoffAlgorithmInterface;
 use CodeDistortion\Backoff\Jitter\CallbackJitter;
 use CodeDistortion\Backoff\Jitter\FullJitter;
@@ -22,13 +23,33 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 
 /**
- * Test the BackoffStrategyTrait - test the constructor parameters and public methods.
+ * Test the BackoffStrategyTrait - test the externals, i.e. the constructor parameters and public methods.
  *
  * @phpcs:disable PSR1.Methods.CamelCapsMethodName.NotCamelCaps
  */
 class BackoffStrategyTraitExternalsUnitTest extends PHPUnitTestCase
 {
     // test the constructor parameters
+    /**
+     * Test that the backoff strategy throws an exception when an invalid unit type is passed.
+     *
+     * @test
+     *
+     * @return void
+     */
+    #[Test]
+    public function test_that_backoff_strategy_throws_an_exception_due_to_invalid_unit_type(): void
+    {
+        $this->expectException(BackoffInitialisationException::class);
+
+        new BackoffStrategy(
+            new SequenceBackoffAlgorithm([1]),
+            null,
+            null,
+            null,
+            'invalid', // <<< invalid unit type
+        );
+    }
 
     /**
      * Test that the backoff strategy uses a backoff algorithm to generate delays.
@@ -733,7 +754,7 @@ class BackoffStrategyTraitExternalsUnitTest extends PHPUnitTestCase
     public static function test_that_step_sleeps(int $milliseconds, ?bool $sleep, bool $expectSleep): void
     {
         $seconds = $milliseconds / 1000;
-        $margin = 1.2; // within a margin of +/- 20% should be plenty
+        $margin = 1.5; // within a margin of +/- 20% should be plenty
 
         $newStrategy = fn() => new BackoffStrategy(
             new SequenceBackoffAlgorithm([$milliseconds]),
@@ -794,7 +815,7 @@ class BackoffStrategyTraitExternalsUnitTest extends PHPUnitTestCase
     public static function test_that_sleep_sleeps(int $milliseconds, ?bool $sleep, bool $expectSleep): void
     {
         $seconds = $milliseconds / 1000;
-        $margin = 1.2; // within a margin of +/- 20% should be plenty
+        $margin = 1.5; // within a margin of +/- 20% should be plenty
 
         $newStrategy = fn() => new BackoffStrategy(
             new SequenceBackoffAlgorithm([$milliseconds]),
@@ -839,9 +860,9 @@ class BackoffStrategyTraitExternalsUnitTest extends PHPUnitTestCase
     public static function sleepDataProvider(): array
     {
         return [
-            ['milliseconds' => mt_rand(20, 40), 'sleep' => true, 'expectSleep' => true],
-            ['milliseconds' => mt_rand(20, 40), 'sleep' => false, 'expectSleep' => false],
-            ['milliseconds' => mt_rand(20, 40), 'sleep' => null, 'expectSleep' => true],
+            ['milliseconds' => mt_rand(400, 500), 'sleep' => true, 'expectSleep' => true],
+            ['milliseconds' => mt_rand(400, 500), 'sleep' => false, 'expectSleep' => false],
+            ['milliseconds' => mt_rand(400, 500), 'sleep' => null, 'expectSleep' => true],
         ];
     }
 

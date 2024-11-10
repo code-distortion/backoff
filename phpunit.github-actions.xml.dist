@@ -27,6 +27,8 @@
   failOnRisky="true"
   failOnSkipped="true"
   failOnWarning="true"
+  processIsolation="false"
+  requireCoverageMetadata="false"
   stopOnDefect="true"
   stopOnDeprecation="false"
   stopOnError="true"

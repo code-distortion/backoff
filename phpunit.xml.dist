@@ -27,16 +27,17 @@
   failOnRisky="true"
   failOnSkipped="true"
   failOnWarning="true"
+  processIsolation="false"
   requireCoverageMetadata="false"
-  stopOnDefect="false"
-  stopOnDeprecation="true"
+  stopOnDefect="true"
+  stopOnDeprecation="false"
   stopOnError="true"
   stopOnFailure="true"
   stopOnIncomplete="false"
   stopOnNotice="true"
   stopOnRisky="true"
   stopOnSkipped="false"
-  stopOnWarning="false"
+  stopOnWarning="true"
 >
   <testsuites>
     <testsuite name="Unit">

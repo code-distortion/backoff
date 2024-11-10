@@ -10,6 +10,7 @@ use CodeDistortion\Backoff\Tests\PHPUnitTestCase;
 use CodeDistortion\Backoff\Tests\Unit\Support\InvokableClass;
 use Exception;
 use PHPUnit\Framework\Attributes\Test;
+use Throwable;
 
 /**
  * Test the BackoffRunnerTrait - test "success" callbacks.
@@ -19,7 +20,7 @@ use PHPUnit\Framework\Attributes\Test;
 class BackoffRunnerTraitCallbacksSuccessUnitTest extends PHPUnitTestCase
 {
     /**
-     * Test that different combinations of successCallbacks are called.
+     * Test that different combinations of success callbacks are called successfully.
      *
      * @test
      *
@@ -29,24 +30,22 @@ class BackoffRunnerTraitCallbacksSuccessUnitTest extends PHPUnitTestCase
     public static function test_that_every_success_callback_is_called()
     {
         $maxAttempts = 5;
-        $newBackoff = fn() => Backoff::noop()->maxAttempts($maxAttempts)->retryExceptions();
+        $newBackoff = fn() => Backoff::noop()->maxAttempts($maxAttempts);
 
-        $createCallback = fn(&$count)
-            /** @var AttemptLog[] $logs */
-            => function (array $logs) use (&$count) {
-                $count++;
-            };
+        $createCallback = fn(&$count) => function () use (&$count) {
+            $count++;
+        };
 
 
 
-        // one callback
+        // callback1
         $count1 = 0;
         $newBackoff()
             ->successCallback($createCallback($count1))
             ->attempt(fn() => true, null);
         self::assertSame(1, $count1);
 
-        // two callbacks, separate params
+        // callback1, callback2
         $count1 = $count2 = 0;
         $newBackoff()
             ->successCallback($createCallback($count1), $createCallback($count2))
@@ -54,7 +53,7 @@ class BackoffRunnerTraitCallbacksSuccessUnitTest extends PHPUnitTestCase
         self::assertSame(1, $count1);
         self::assertSame(1, $count2);
 
-        // three callbacks, separate params, two in an array
+        // callback1, [callback2, callback3]
         $count1 = $count2 = $count3 = 0;
         $newBackoff()
             ->successCallback($createCallback($count1), [$createCallback($count2), $createCallback($count3)])
@@ -63,7 +62,8 @@ class BackoffRunnerTraitCallbacksSuccessUnitTest extends PHPUnitTestCase
         self::assertSame(1, $count2);
         self::assertSame(1, $count3);
 
-        // four callbacks, two calls, including an array
+        // callback1
+        // [callback2, callback3, callback4]
         $count1 = $count2 = $count3 = $count4 = 0;
         $newBackoff()
             ->successCallback($createCallback($count1))
@@ -74,7 +74,9 @@ class BackoffRunnerTraitCallbacksSuccessUnitTest extends PHPUnitTestCase
         self::assertSame(1, $count3);
         self::assertSame(1, $count4);
 
-        // three callbacks, separate calls
+        // callback1
+        // callback2
+        // callback3
         $count1 = $count2 = $count3 = 0;
         $newBackoff()
             ->successCallback($createCallback($count1))
@@ -85,7 +87,9 @@ class BackoffRunnerTraitCallbacksSuccessUnitTest extends PHPUnitTestCase
         self::assertSame(1, $count2);
         self::assertSame(1, $count3);
 
-        // one callback as a callable array
+
+
+        // a callable array. i.e. [class, method]
         $invokableClass = new InvokableClass();
         $callable = [$invokableClass, '__invoke'];
 
@@ -96,8 +100,8 @@ class BackoffRunnerTraitCallbacksSuccessUnitTest extends PHPUnitTestCase
     }
 
     /**
-     * Test that the success callback is called only once when expected, even if exceptions or invalid values have
-     * caused multiple retries.
+     * Test that success callbacks are called only once when expected, even if exceptions or invalid values have caused
+     * multiple retries.
      *
      * @test
      *
@@ -106,11 +110,9 @@ class BackoffRunnerTraitCallbacksSuccessUnitTest extends PHPUnitTestCase
     #[Test]
     public static function test_that_success_callbacks_are_called_only_once_when_expected(): void
     {
-        $createCallback = fn(&$count)
-            /** @var AttemptLog[] $logs */
-            => function (array $logs) use (&$count) {
-                $count++;
-            };
+        $createCallback = fn(&$count) => function () use (&$count) {
+            $count++;
+        };
 
         // generate a callback that throws a callback until it's been called a certain number of times
         $succeedAfterXCallback = function ($count) {
@@ -128,7 +130,6 @@ class BackoffRunnerTraitCallbacksSuccessUnitTest extends PHPUnitTestCase
 
                 $count1 = 0;
                 Backoff::noop()
-                    ->retryExceptions()
                     ->maxAttempts($maxAttempts)
                     ->successCallback($createCallback($count1))
                     ->attempt($succeedAfterXCallback($succeedAfter), null);
@@ -140,41 +141,130 @@ class BackoffRunnerTraitCallbacksSuccessUnitTest extends PHPUnitTestCase
     }
 
     /**
-     * Test that the array of AttemptLogs are passed to success callbacks.
+     * Test the parameters that can be passed to success callbacks.
      *
      * @test
      *
      * @return void
      */
     #[Test]
-    public static function test_that_attempt_logs_are_passed_to_success_callbacks(): void
+    public static function test_parameters_passed_to_success_callbacks(): void
     {
-        // generate a callback that throws a callback until it's been called a certain number of times
-        $succeedAfterXCallback = function ($count) {
+        // generate a callback that throws an exception until it's been called a certain number of times
+        $succeedAfterXCallback = function ($count, $successResult) {
             $current = 0;
-            return function () use (&$current, $count) {
+            return function () use (&$current, $count, $successResult) {
                 $current++;
                 if ($current < $count) {
                     throw new Exception();
                 }
+                return $successResult;
+            };
+        };
+
+        $createCallback = function (
+            $succeedAfter,
+            $intendedResult,
+            &$passedLogs,
+        ) {
+            return function (
+                $result,
+                AttemptLog $attemptLog,
+                $log,
+                $logs,
+            ) use (
+                $succeedAfter,
+                $intendedResult,
+                &$passedLogs,
+            ) {
+                // check that $result was passed correctly
+                self::assertSame($intendedResult, $result);
+
+                // check that current AttemptLogs was passed correctly
+                self::assertInstanceOf(AttemptLog::class, $attemptLog);
+                self::assertSame($attemptLog, $log);
+                self::assertSame($succeedAfter, $attemptLog->attemptNumber());
+                self::assertSame(10, $attemptLog->maxAttempts());
+
+                // check that $logs was passed correctly
+                self::assertIsArray($logs);
+                self::assertCount($succeedAfter, $logs);
+                foreach ($logs as $log2) {
+                    self::assertInstanceOf(AttemptLog::class, $log2);
+                    self::assertSame(10, $log2->maxAttempts());
+                }
+
+                $passedLogs = $logs;
             };
         };
 
         foreach ([1, 2, 3, 4] as $succeedAfter) {
 
+            $intendedResult = mt_rand(0, 10);
             $passedLogs = null;
-            $callback = function (array $logs) use (&$passedLogs) {
-                /** @var AttemptLog[] $logs */
-                $passedLogs = $logs;
-            };
 
             $backoff = Backoff::noop()
                 ->maxAttempts(10)
-                ->retryExceptions()
-                ->successCallback($callback);
-            $backoff->attempt($succeedAfterXCallback($succeedAfter), null);
+                ->successCallback($createCallback($succeedAfter, $intendedResult, $passedLogs));
+            $backoff->attempt($succeedAfterXCallback($succeedAfter, $intendedResult), null);
 
             self::assertSame($backoff->logs(), $passedLogs);
         }
+    }
+
+    /**
+     * Test that success callbacks aren't called when they have arguments that don't match.
+     *
+     * @test
+     *
+     * @return void
+     */
+    #[Test]
+    public static function test_that_success_callbacks_arent_called_when_their_arguments_dont_match(): void
+    {
+        $count1 = 0;
+        $callback1 = function ($log) use (&$count1) {
+            $count1++;
+        };
+        $count2 = 0;
+        $callback2 = function ($log, int $int) use (&$count2) {
+            $count2++;
+        };
+
+        Backoff::noop()->maxAttempts(1)
+            ->successCallback($callback1, $callback2)
+            ->attempt(fn() => true, null);
+        self::assertSame(1, $count1);
+        self::assertSame(0, $count2);
+    }
+
+    /**
+     * Test that exceptions thrown by success callbacks are thrown.
+     *
+     * @test
+     *
+     * @return void
+     */
+    #[Test]
+    public static function test_that_success_callback_exceptions_are_thrown(): void
+    {
+        $exception = new Exception();
+        $count = 0;
+        $callback = function () use (&$count, $exception) {
+            $count++;
+            throw $exception;
+        };
+
+        $e = null;
+        try {
+            Backoff::noop()
+                ->successCallback($callback)
+                ->attempt(fn() => true, null);
+        } catch (Throwable $e) {
+        }
+
+        self::assertInstanceOf(Exception::class, $e);
+        self::assertSame($exception, $e);
+        self::assertSame(1, $count);
     }
 }

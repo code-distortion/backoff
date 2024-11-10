@@ -20,7 +20,7 @@ use Throwable;
 class BackoffRunnerTraitCallbacksFinallyUnitTest extends PHPUnitTestCase
 {
     /**
-     * Test that different combinations of finallyCallbacks are called.
+     * Test that different combinations of finally callbacks are called successfully.
      *
      * @test
      *
@@ -32,22 +32,20 @@ class BackoffRunnerTraitCallbacksFinallyUnitTest extends PHPUnitTestCase
         $maxAttempts = 5;
         $newBackoff = fn() => Backoff::noop()->maxAttempts($maxAttempts)->retryExceptions();
 
-        $createCallback = fn(&$count)
-            /** @var AttemptLog[] $logs */
-            => function (array $logs) use (&$count) {
-                $count++;
-            };
+        $createCallback = fn(&$count) => function ($logs) use (&$count) {
+            $count++;
+        };
 
 
 
-        // one callback
+        // callback1
         $count1 = 0;
         $newBackoff()
             ->finallyCallback($createCallback($count1))
             ->attempt(fn() => true, null);
         self::assertSame(1, $count1);
 
-        // two callbacks, separate params
+        // callback1, callback2
         $count1 = $count2 = 0;
         $newBackoff()
             ->finallyCallback($createCallback($count1), $createCallback($count2))
@@ -55,7 +53,7 @@ class BackoffRunnerTraitCallbacksFinallyUnitTest extends PHPUnitTestCase
         self::assertSame(1, $count1);
         self::assertSame(1, $count2);
 
-        // three callbacks, separate params, two in an array
+        // callback1, [callback2, callback3]
         $count1 = $count2 = $count3 = 0;
         $newBackoff()
             ->finallyCallback($createCallback($count1), [$createCallback($count2), $createCallback($count3)])
@@ -64,7 +62,8 @@ class BackoffRunnerTraitCallbacksFinallyUnitTest extends PHPUnitTestCase
         self::assertSame(1, $count2);
         self::assertSame(1, $count3);
 
-        // four callbacks, two calls, including an array
+        // callback1
+        // [callback2, callback3, callback4]
         $count1 = $count2 = $count3 = $count4 = 0;
         $newBackoff()
             ->finallyCallback($createCallback($count1))
@@ -75,7 +74,9 @@ class BackoffRunnerTraitCallbacksFinallyUnitTest extends PHPUnitTestCase
         self::assertSame(1, $count3);
         self::assertSame(1, $count4);
 
-        // three callbacks, separate calls
+        // callback1
+        // callback2
+        // callback3
         $count1 = $count2 = $count3 = 0;
         $newBackoff()
             ->finallyCallback($createCallback($count1))
@@ -86,7 +87,9 @@ class BackoffRunnerTraitCallbacksFinallyUnitTest extends PHPUnitTestCase
         self::assertSame(1, $count2);
         self::assertSame(1, $count3);
 
-        // one callback as a callable array
+
+
+        // a callable array. i.e. [class, method]
         $invokableClass = new InvokableClass();
         $callable = [$invokableClass, '__invoke'];
 
@@ -97,8 +100,8 @@ class BackoffRunnerTraitCallbacksFinallyUnitTest extends PHPUnitTestCase
     }
 
     /**
-     * Test that the "finally" callback is called only once when expected, even if exceptions or invalid values have
-     * caused multiple retries.
+     * Test that finally callbacks are called only once when expected, even if exceptions or invalid values have caused
+     * multiple retries.
      *
      * @test
      *
@@ -107,11 +110,9 @@ class BackoffRunnerTraitCallbacksFinallyUnitTest extends PHPUnitTestCase
     #[Test]
     public static function test_that_finally_callbacks_are_called_only_once_when_expected(): void
     {
-        $createCallback = fn(&$count)
-            /** @var AttemptLog[] $logs */
-            => function (array $logs) use (&$count) {
-                $count++;
-            };
+        $createCallback = fn(&$count) => function () use (&$count) {
+            $count++;
+        };
 
         // generate a callback that throws a callback until it's been called a certain number of times
         $succeedAfterXCallback = function ($count) {
@@ -125,7 +126,7 @@ class BackoffRunnerTraitCallbacksFinallyUnitTest extends PHPUnitTestCase
         };
 
         foreach ([0, 1, 5] as $maxAttempts) {
-            foreach ([ 1, 2, 4, 5, 6] as $succeedAfter) {
+            foreach ([1, 2, 4, 5, 6] as $succeedAfter) {
 
                 // when a default value is returned
                 $count1 = 0;
@@ -133,7 +134,7 @@ class BackoffRunnerTraitCallbacksFinallyUnitTest extends PHPUnitTestCase
                     ->retryExceptions()
                     ->maxAttempts($maxAttempts)
                     ->finallyCallback($createCallback($count1))
-                    ->attempt($succeedAfterXCallback($succeedAfter), null);
+                    ->attempt($succeedAfterXCallback($succeedAfter), null); // <<< default
 
                 self::assertSame(1, $count1); // <<<
 
@@ -144,7 +145,7 @@ class BackoffRunnerTraitCallbacksFinallyUnitTest extends PHPUnitTestCase
                         ->retryExceptions()
                         ->maxAttempts($maxAttempts)
                         ->finallyCallback($createCallback($count1))
-                        ->attempt($succeedAfterXCallback($succeedAfter));
+                        ->attempt($succeedAfterXCallback($succeedAfter)); // <<< no default (exception rethrown)
                 } catch (Throwable) {
                 }
 
@@ -154,30 +155,114 @@ class BackoffRunnerTraitCallbacksFinallyUnitTest extends PHPUnitTestCase
     }
 
     /**
-     * Test that the array of AttemptLogs are passed to finally callbacks.
+     * Test the parameters that can be passed to finally callbacks.
      *
      * @test
      *
      * @return void
      */
     #[Test]
-    public static function test_that_attempt_logs_are_passed_to_finally_callbacks(): void
+    public static function test_parameters_passed_to_finally_callbacks(): void
     {
-        foreach ([0, 1, 2, 3, 4] as $maxAttempts) {
+        $createCallback = function (
+            $maxAttempts,
+            &$passedLogs,
+        ) {
+            return function (
+                AttemptLog $attemptLog,
+                $log,
+                $logs,
+            ) use (
+                $maxAttempts,
+                &$passedLogs,
+            ) {
+                // check that current AttemptLogs was passed correctly
+                self::assertInstanceOf(AttemptLog::class, $attemptLog);
+                self::assertSame($attemptLog, $log);
+                self::assertSame($maxAttempts, $attemptLog->attemptNumber());
+                self::assertSame($maxAttempts, $attemptLog->maxAttempts());
 
-            $passedLogs = null;
-            $callback = function (array $logs) use (&$passedLogs) {
-                /** @var AttemptLog[] $logs */
+                // check that $logs was passed correctly
+                self::assertIsArray($logs);
+                self::assertCount($maxAttempts, $logs);
+                foreach ($logs as $log2) {
+                    self::assertInstanceOf(AttemptLog::class, $log2);
+                    self::assertSame($maxAttempts, $log2->maxAttempts());
+                }
+
                 $passedLogs = $logs;
             };
+        };
+
+        foreach ([1, 2, 3, 4] as $maxAttempts) {
+
+            $passedLogs = null;
 
             $backoff = Backoff::noop()
                 ->retryExceptions()
                 ->maxAttempts($maxAttempts)
-                ->finallyCallback($callback);
-            $backoff->attempt(fn() => true, null);
+                ->finallyCallback($createCallback($maxAttempts, $passedLogs));
+            $backoff->attempt(fn() => throw new Exception(), null);
 
             self::assertSame($backoff->logs(), $passedLogs);
         }
+    }
+
+    /**
+     * Test that finally callbacks aren't called when they have arguments that don't match.
+     *
+     * @test
+     *
+     * @return void
+     */
+    #[Test]
+    public static function test_that_finally_callbacks_arent_called_when_their_arguments_dont_match(): void
+    {
+        $count1 = 0;
+        $callback1 = function ($log) use (&$count1) {
+            $count1++;
+        };
+        $count2 = 0;
+        $callback2 = function ($log, int $int) use (&$count2) {
+            $count2++;
+        };
+
+        Backoff::noop()
+            ->maxAttempts(1)
+            ->finallyCallback($callback1, $callback2)
+            ->attempt(fn() => true);
+        self::assertSame(1, $count1);
+        self::assertSame(0, $count2);
+    }
+
+    /**
+     * Test that exceptions thrown by finally callbacks are thrown.
+     *
+     * @test
+     *
+     * @return void
+     */
+    #[Test]
+    public static function test_that_finally_callback_exceptions_are_thrown(): void
+    {
+        $exception = new Exception();
+        $count = 0;
+        $callback = function () use (&$count, $exception) {
+            $count++;
+            throw $exception;
+        };
+
+        $e = null;
+        try {
+            Backoff::noop()
+                ->maxAttempts(1)
+                ->finallyCallback($callback)
+                ->attempt(fn() => true);
+        } catch (Throwable $e) {
+        }
+
+        self::assertInstanceOf(Exception::class, $e);
+        self::assertSame($exception, $e);
+        self::assertSame(1, $count);
     }
 }

@@ -34,9 +34,9 @@ class BackoffStrategyDecoratorTraitUnitTest extends PHPUnitTestCase
     public static function test_the_fixed_alternative_constructors(): void
     {
         $expected = [5, 5, 5, 5, 5, 5, 5, 5, 5, 5];
-        self::testAltConstBackoff(Backoff::fixed(5), $expected, Settings::UNIT_SECONDS);
-        self::testAltConstBackoff(Backoff::fixedMs(5), $expected, Settings::UNIT_MILLISECONDS);
-        self::testAltConstBackoff(Backoff::fixedUs(5), $expected, Settings::UNIT_MICROSECONDS);
+        self::checkAltConstBackoff(Backoff::fixed(5), $expected, Settings::UNIT_SECONDS);
+        self::checkAltConstBackoff(Backoff::fixedMs(5), $expected, Settings::UNIT_MILLISECONDS);
+        self::checkAltConstBackoff(Backoff::fixedUs(5), $expected, Settings::UNIT_MICROSECONDS);
     }
 
     /**
@@ -50,14 +50,14 @@ class BackoffStrategyDecoratorTraitUnitTest extends PHPUnitTestCase
     public static function test_the_linear_alternative_constructors(): void
     {
         $expected = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50];
-        self::testAltConstBackoff(Backoff::linear(5), $expected, Settings::UNIT_SECONDS);
-        self::testAltConstBackoff(Backoff::linearMs(5), $expected, Settings::UNIT_MILLISECONDS);
-        self::testAltConstBackoff(Backoff::linearUs(5), $expected, Settings::UNIT_MICROSECONDS);
+        self::checkAltConstBackoff(Backoff::linear(5), $expected, Settings::UNIT_SECONDS);
+        self::checkAltConstBackoff(Backoff::linearMs(5), $expected, Settings::UNIT_MILLISECONDS);
+        self::checkAltConstBackoff(Backoff::linearUs(5), $expected, Settings::UNIT_MICROSECONDS);
 
         $expected = [5, 15, 25, 35, 45, 55, 65, 75, 85, 95];
-        self::testAltConstBackoff(Backoff::linear(5, 10), $expected, Settings::UNIT_SECONDS);
-        self::testAltConstBackoff(Backoff::linearMs(5, 10), $expected, Settings::UNIT_MILLISECONDS);
-        self::testAltConstBackoff(Backoff::linearUs(5, 10), $expected, Settings::UNIT_MICROSECONDS);
+        self::checkAltConstBackoff(Backoff::linear(5, 10), $expected, Settings::UNIT_SECONDS);
+        self::checkAltConstBackoff(Backoff::linearMs(5, 10), $expected, Settings::UNIT_MILLISECONDS);
+        self::checkAltConstBackoff(Backoff::linearUs(5, 10), $expected, Settings::UNIT_MICROSECONDS);
     }
 
     /**
@@ -71,14 +71,14 @@ class BackoffStrategyDecoratorTraitUnitTest extends PHPUnitTestCase
     public static function test_the_exponential_alternative_constructors(): void
     {
         $expected = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512];
-        self::testAltConstBackoff(Backoff::exponential(1), $expected, Settings::UNIT_SECONDS);
-        self::testAltConstBackoff(Backoff::exponentialMs(1), $expected, Settings::UNIT_MILLISECONDS);
-        self::testAltConstBackoff(Backoff::exponentialUs(1), $expected, Settings::UNIT_MICROSECONDS);
+        self::checkAltConstBackoff(Backoff::exponential(1), $expected, Settings::UNIT_SECONDS);
+        self::checkAltConstBackoff(Backoff::exponentialMs(1), $expected, Settings::UNIT_MILLISECONDS);
+        self::checkAltConstBackoff(Backoff::exponentialUs(1), $expected, Settings::UNIT_MICROSECONDS);
 
         $expected = [1.0, 1.5, 2.25, 3.375, 5.0625, 7.59375, 11.390625, 17.0859375, 25.62890625, 38.443359375];
-        self::testAltConstBackoff(Backoff::exponential(1, 1.5), $expected, Settings::UNIT_SECONDS);
-        self::testAltConstBackoff(Backoff::exponentialMs(1, 1.5), $expected, Settings::UNIT_MILLISECONDS);
-        self::testAltConstBackoff(Backoff::exponentialUs(1, 1.5), $expected, Settings::UNIT_MICROSECONDS);
+        self::checkAltConstBackoff(Backoff::exponential(1, 1.5), $expected, Settings::UNIT_SECONDS);
+        self::checkAltConstBackoff(Backoff::exponentialMs(1, 1.5), $expected, Settings::UNIT_MILLISECONDS);
+        self::checkAltConstBackoff(Backoff::exponentialUs(1, 1.5), $expected, Settings::UNIT_MICROSECONDS);
     }
 
     /**
@@ -92,9 +92,9 @@ class BackoffStrategyDecoratorTraitUnitTest extends PHPUnitTestCase
     public static function test_the_polynomial_alternative_constructors(): void
     {
         $expected = [1, 4, 9, 16, 25, 36, 49, 64, 81, 100];
-        self::testAltConstBackoff(Backoff::polynomial(1), $expected, Settings::UNIT_SECONDS);
-        self::testAltConstBackoff(Backoff::polynomialMs(1), $expected, Settings::UNIT_MILLISECONDS);
-        self::testAltConstBackoff(Backoff::polynomialUs(1), $expected, Settings::UNIT_MICROSECONDS);
+        self::checkAltConstBackoff(Backoff::polynomial(1), $expected, Settings::UNIT_SECONDS);
+        self::checkAltConstBackoff(Backoff::polynomialMs(1), $expected, Settings::UNIT_MILLISECONDS);
+        self::checkAltConstBackoff(Backoff::polynomialUs(1), $expected, Settings::UNIT_MICROSECONDS);
 
         $expected = [
             1.0,
@@ -108,9 +108,9 @@ class BackoffStrategyDecoratorTraitUnitTest extends PHPUnitTestCase
             21.674022167526225,
             25.118864315095795,
         ];
-        self::testAltConstBackoff(Backoff::polynomial(1, 1.4), $expected, Settings::UNIT_SECONDS);
-        self::testAltConstBackoff(Backoff::polynomialMs(1, 1.4), $expected, Settings::UNIT_MILLISECONDS);
-        self::testAltConstBackoff(Backoff::polynomialUs(1, 1.4), $expected, Settings::UNIT_MICROSECONDS);
+        self::checkAltConstBackoff(Backoff::polynomial(1, 1.4), $expected, Settings::UNIT_SECONDS);
+        self::checkAltConstBackoff(Backoff::polynomialMs(1, 1.4), $expected, Settings::UNIT_MILLISECONDS);
+        self::checkAltConstBackoff(Backoff::polynomialUs(1, 1.4), $expected, Settings::UNIT_MICROSECONDS);
     }
 
     /**
@@ -124,19 +124,19 @@ class BackoffStrategyDecoratorTraitUnitTest extends PHPUnitTestCase
     public static function test_the_fibonacci_alternative_constructors(): void
     {
         $expected = [1, 1, 2, 3, 5, 8, 13, 21, 34, 55];
-        self::testAltConstBackoff(Backoff::fibonacci(1), $expected, Settings::UNIT_SECONDS);
-        self::testAltConstBackoff(Backoff::fibonacciMs(1), $expected, Settings::UNIT_MILLISECONDS);
-        self::testAltConstBackoff(Backoff::fibonacciUs(1), $expected, Settings::UNIT_MICROSECONDS);
+        self::checkAltConstBackoff(Backoff::fibonacci(1), $expected, Settings::UNIT_SECONDS);
+        self::checkAltConstBackoff(Backoff::fibonacciMs(1), $expected, Settings::UNIT_MILLISECONDS);
+        self::checkAltConstBackoff(Backoff::fibonacciUs(1), $expected, Settings::UNIT_MICROSECONDS);
 
         $expected = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89];
-        self::testAltConstBackoff(Backoff::fibonacci(1, false), $expected, Settings::UNIT_SECONDS);
-        self::testAltConstBackoff(Backoff::fibonacciMs(1, false), $expected, Settings::UNIT_MILLISECONDS);
-        self::testAltConstBackoff(Backoff::fibonacciUs(1, false), $expected, Settings::UNIT_MICROSECONDS);
+        self::checkAltConstBackoff(Backoff::fibonacci(1, false), $expected, Settings::UNIT_SECONDS);
+        self::checkAltConstBackoff(Backoff::fibonacciMs(1, false), $expected, Settings::UNIT_MILLISECONDS);
+        self::checkAltConstBackoff(Backoff::fibonacciUs(1, false), $expected, Settings::UNIT_MICROSECONDS);
 
         $expected = [1, 1, 2, 3, 5, 8, 13, 21, 34, 55];
-        self::testAltConstBackoff(Backoff::fibonacci(1, true), $expected, Settings::UNIT_SECONDS);
-        self::testAltConstBackoff(Backoff::fibonacciMs(1, true), $expected, Settings::UNIT_MILLISECONDS);
-        self::testAltConstBackoff(Backoff::fibonacciUs(1, true), $expected, Settings::UNIT_MICROSECONDS);
+        self::checkAltConstBackoff(Backoff::fibonacci(1, true), $expected, Settings::UNIT_SECONDS);
+        self::checkAltConstBackoff(Backoff::fibonacciMs(1, true), $expected, Settings::UNIT_MILLISECONDS);
+        self::checkAltConstBackoff(Backoff::fibonacciUs(1, true), $expected, Settings::UNIT_MICROSECONDS);
     }
 
     /**
@@ -152,19 +152,19 @@ class BackoffStrategyDecoratorTraitUnitTest extends PHPUnitTestCase
         $initialDelay = 1;
         $multiplier = 3;
 
-        self::testRandomBasedAltConstBackoff(
+        self::checkRandomBasedAltConstBackoff(
             Backoff::decorrelated($initialDelay, $multiplier),
             $initialDelay,
             null,
             Settings::UNIT_SECONDS
         );
-        self::testRandomBasedAltConstBackoff(
+        self::checkRandomBasedAltConstBackoff(
             Backoff::decorrelatedMs($initialDelay, $multiplier),
             $initialDelay,
             null,
             Settings::UNIT_MILLISECONDS
         );
-        self::testRandomBasedAltConstBackoff(
+        self::checkRandomBasedAltConstBackoff(
             Backoff::decorrelatedUs($initialDelay, $multiplier),
             $initialDelay,
             null,
@@ -185,9 +185,9 @@ class BackoffStrategyDecoratorTraitUnitTest extends PHPUnitTestCase
         $min = mt_rand(0, 100000);
         $max = mt_rand($min, $min + 10);
 
-        self::testRandomBasedAltConstBackoff(Backoff::random($min, $max), $min, $max, Settings::UNIT_SECONDS);
-        self::testRandomBasedAltConstBackoff(Backoff::randomMs($min, $max), $min, $max, Settings::UNIT_MILLISECONDS);
-        self::testRandomBasedAltConstBackoff(Backoff::randomUs($min, $max), $min, $max, Settings::UNIT_MICROSECONDS);
+        self::checkRandomBasedAltConstBackoff(Backoff::random($min, $max), $min, $max, Settings::UNIT_SECONDS);
+        self::checkRandomBasedAltConstBackoff(Backoff::randomMs($min, $max), $min, $max, Settings::UNIT_MILLISECONDS);
+        self::checkRandomBasedAltConstBackoff(Backoff::randomUs($min, $max), $min, $max, Settings::UNIT_MICROSECONDS);
     }
 
     /**
@@ -202,18 +202,18 @@ class BackoffStrategyDecoratorTraitUnitTest extends PHPUnitTestCase
     {
         $sequence = [9, 8, 7, 6, 5];
         $expected = [9, 8, 7, 6, 5];
-        self::testAltConstBackoff(Backoff::sequence($sequence), $expected, Settings::UNIT_SECONDS);
-        self::testAltConstBackoff(Backoff::sequenceMs($sequence), $expected, Settings::UNIT_MILLISECONDS);
-        self::testAltConstBackoff(Backoff::sequenceUs($sequence), $expected, Settings::UNIT_MICROSECONDS);
+        self::checkAltConstBackoff(Backoff::sequence($sequence), $expected, Settings::UNIT_SECONDS);
+        self::checkAltConstBackoff(Backoff::sequenceMs($sequence), $expected, Settings::UNIT_MILLISECONDS);
+        self::checkAltConstBackoff(Backoff::sequenceUs($sequence), $expected, Settings::UNIT_MICROSECONDS);
 
-        self::testAltConstBackoff(Backoff::sequence($sequence, false), $expected, Settings::UNIT_SECONDS);
-        self::testAltConstBackoff(Backoff::sequenceMs($sequence, false), $expected, Settings::UNIT_MILLISECONDS);
-        self::testAltConstBackoff(Backoff::sequenceUs($sequence, false), $expected, Settings::UNIT_MICROSECONDS);
+        self::checkAltConstBackoff(Backoff::sequence($sequence, false), $expected, Settings::UNIT_SECONDS);
+        self::checkAltConstBackoff(Backoff::sequenceMs($sequence, false), $expected, Settings::UNIT_MILLISECONDS);
+        self::checkAltConstBackoff(Backoff::sequenceUs($sequence, false), $expected, Settings::UNIT_MICROSECONDS);
 
         $expected = [9, 8, 7, 6, 5, 5, 5, 5, 5, 5];
-        self::testAltConstBackoff(Backoff::sequence($sequence, true), $expected, Settings::UNIT_SECONDS);
-        self::testAltConstBackoff(Backoff::sequenceMs($sequence, true), $expected, Settings::UNIT_MILLISECONDS);
-        self::testAltConstBackoff(Backoff::sequenceUs($sequence, true), $expected, Settings::UNIT_MICROSECONDS);
+        self::checkAltConstBackoff(Backoff::sequence($sequence, true), $expected, Settings::UNIT_SECONDS);
+        self::checkAltConstBackoff(Backoff::sequenceMs($sequence, true), $expected, Settings::UNIT_MILLISECONDS);
+        self::checkAltConstBackoff(Backoff::sequenceUs($sequence, true), $expected, Settings::UNIT_MICROSECONDS);
     }
 
     /**
@@ -230,9 +230,9 @@ class BackoffStrategyDecoratorTraitUnitTest extends PHPUnitTestCase
             ? $retryNumber * 1000
             : null; // stop after 3 delays
         $expected = [1000, 2000, 3000];
-        self::testAltConstBackoff(Backoff::callback($callback), $expected, Settings::UNIT_SECONDS);
-        self::testAltConstBackoff(Backoff::callbackMs($callback), $expected, Settings::UNIT_MILLISECONDS);
-        self::testAltConstBackoff(Backoff::callbackUs($callback), $expected, Settings::UNIT_MICROSECONDS);
+        self::checkAltConstBackoff(Backoff::callback($callback), $expected, Settings::UNIT_SECONDS);
+        self::checkAltConstBackoff(Backoff::callbackMs($callback), $expected, Settings::UNIT_MILLISECONDS);
+        self::checkAltConstBackoff(Backoff::callbackUs($callback), $expected, Settings::UNIT_MICROSECONDS);
     }
 
     /**
@@ -247,9 +247,9 @@ class BackoffStrategyDecoratorTraitUnitTest extends PHPUnitTestCase
     {
         $algorithm = new LinearBackoffAlgorithm(5, 10);
         $expected = [5, 15, 25, 35, 45, 55, 65, 75, 85, 95];
-        self::testAltConstBackoff(Backoff::custom($algorithm), $expected, Settings::UNIT_SECONDS);
-        self::testAltConstBackoff(Backoff::customMs($algorithm), $expected, Settings::UNIT_MILLISECONDS);
-        self::testAltConstBackoff(Backoff::customUs($algorithm), $expected, Settings::UNIT_MICROSECONDS);
+        self::checkAltConstBackoff(Backoff::custom($algorithm), $expected, Settings::UNIT_SECONDS);
+        self::checkAltConstBackoff(Backoff::customMs($algorithm), $expected, Settings::UNIT_MILLISECONDS);
+        self::checkAltConstBackoff(Backoff::customUs($algorithm), $expected, Settings::UNIT_MICROSECONDS);
     }
 
     /**
@@ -291,7 +291,7 @@ class BackoffStrategyDecoratorTraitUnitTest extends PHPUnitTestCase
      * @param 'seconds'|'milliseconds'|'microseconds' $units                The units the delays are expected to be in.
      * @return void
      */
-    private static function testAltConstBackoff(Backoff $backoff, array $expectedWithNoJitter, string $units): void
+    private static function checkAltConstBackoff(Backoff $backoff, array $expectedWithNoJitter, string $units): void
     {
         $sequenceJitter = $backoff->reset()->generateTestSequence(10);
         $sequenceNoJitter = $backoff->reset()->noJitter()->generateTestSequence(10);
@@ -320,7 +320,7 @@ class BackoffStrategyDecoratorTraitUnitTest extends PHPUnitTestCase
      * @param 'seconds'|'milliseconds'|'microseconds' $units   The units the delays are expected to be in.
      * @return void
      */
-    private static function testRandomBasedAltConstBackoff(
+    private static function checkRandomBasedAltConstBackoff(
         Backoff $backoff,
         int|float|null $min,
         int|float|null $max,

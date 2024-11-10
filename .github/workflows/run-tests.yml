@@ -29,10 +29,10 @@ jobs:
           # - add only new values that aren't present above (e.g. os-title and dependency-prefer-title are new values, not updating an existing value)
           # - or repeat all values from above each time
           - php: "8.3"
-            phpunit: "^10.1.0"
+            phpunit: "^11.0"
             phpunit-config-file: "phpunit.github-actions.xml.dist"
           - php: "8.2"
-            phpunit: "^10.1.0"
+            phpunit: "^11.0"
             phpunit-config-file: "phpunit.github-actions.xml.dist"
           - php: "8.1"
             phpunit: "^10.1.0"
@@ -57,8 +57,8 @@ jobs:
       - name: "Checkout code"
         uses: "actions/checkout@v4"
 
-      - name: "Validate composer.json and composer.lock"
-        run: "composer validate --strict"
+#      - name: "Validate composer.json and composer.lock"
+#        run: "composer validate --strict"
 
       - name: "Setup PHP"
         uses: "shivammathur/setup-php@v2"

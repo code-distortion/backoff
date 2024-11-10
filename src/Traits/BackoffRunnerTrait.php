@@ -344,6 +344,8 @@ trait BackoffRunnerTrait
         $result = null;
 
         $attemptException = null;
+        $successCallbackException = null;
+        $finallyCallbackException = null;
         $invalidResultCallbackException = null;
 
         // $this->strategy->step()
@@ -381,8 +383,23 @@ trait BackoffRunnerTrait
 
                 // if the result was successful, return it
                 if ($wasSuccessful) {
-                    $this->callSuccessCallbacks($result);
-                    $this->callFinallyCallbacks();
+
+                    try {
+                        $this->callSuccessCallbacks($result);
+                    } catch (Throwable $successCallbackException) {
+                        // the exception is stored in $successCallbackException
+                        // and re-thrown below, outside the main try/catch which we're currently in
+                        break;
+                    }
+
+                    try {
+                        $this->callFinallyCallbacks();
+                    } catch (Throwable $finallyCallbackException) {
+                        // the exception is stored in $finallyCallbackException
+                        // and re-thrown below, outside the main try/catch which we're currently in
+                        break;
+                    }
+
                     return $result;
                 }
 
@@ -390,7 +407,7 @@ trait BackoffRunnerTrait
                     $this->callInvalidResultCallbacks($result, !$this->isLastAttempt());
                 } catch (Throwable $invalidResultCallbackException) {
                     // the exception is stored in $invalidResultCallbackException
-                    // and re-thrown below, outside the main try/catch
+                    // and re-thrown below, outside the main try/catch which we're currently in
                     break;
                 }
 
@@ -423,12 +440,20 @@ trait BackoffRunnerTrait
             }
         }
 
-        $this->callFailureCallbacks();
-        $this->callFinallyCallbacks();
+        if (!is_null($successCallbackException)) {
+            throw $successCallbackException;
+        }
+
+        if (!is_null($finallyCallbackException)) {
+            throw $finallyCallbackException;
+        }
 
         if (!is_null($invalidResultCallbackException)) {
             throw $invalidResultCallbackException;
         }
+
+        $this->callFailureCallbacks();
+        $this->callFinallyCallbacks();
 
         if ($overrideDefault) {
             return $this->resolveDefaultValue($overrideDefaultWith);
@@ -635,7 +660,7 @@ trait BackoffRunnerTrait
     private function callCallback(DICaller $caller): mixed
     {
         $currentLog = $this->currentLog();
-        if ($currentLog) {
+        if (!is_null($currentLog)) {
             $caller->registerByName('log', $currentLog)
                 ->registerByType($currentLog);
         }

@@ -8,7 +8,6 @@ use CodeDistortion\Backoff\Algorithms\CallbackBackoffAlgorithm;
 use CodeDistortion\Backoff\Algorithms\FixedBackoffAlgorithm;
 use CodeDistortion\Backoff\Algorithms\LinearBackoffAlgorithm;
 use CodeDistortion\Backoff\Algorithms\SequenceBackoffAlgorithm;
-use CodeDistortion\Backoff\Exceptions\BackoffInitialisationException;
 use CodeDistortion\Backoff\Jitter\CallbackJitter;
 use CodeDistortion\Backoff\Jitter\FullJitter;
 use CodeDistortion\Backoff\Settings;
@@ -19,36 +18,13 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 
 /**
- * Test the BackoffStrategyTrait - test things inside that happen intrinsically, but aren't necessarily obvious from the
- * public methods being called.
+ * Test the BackoffStrategyTrait - test the internals. i.e. test things inside that happen intrinsically, but aren't
+ * necessarily obvious from the public methods being called.
  *
  * @phpcs:disable PSR1.Methods.CamelCapsMethodName.NotCamelCaps
  */
 class BackoffStrategyTraitInternalsUnitTest extends PHPUnitTestCase
 {
-    /**
-     * Test that the backoff strategy throws an exception when an invalid unit type is passed.
-     *
-     * @test
-     *
-     * @return void
-     */
-    #[Test]
-    public function test_that_backoff_strategy_throws_an_exception_due_to_invalid_unit_type(): void
-    {
-        $this->expectException(BackoffInitialisationException::class);
-
-        new BackoffStrategy(
-            new SequenceBackoffAlgorithm([1]),
-            null,
-            null,
-            null,
-            'invalid', // <<< invalid unit type
-        );
-    }
-
-
-
     /**
      * Test that the initial stopped state is resolved properly, which shows whether it's allowed to start, or if it's
      * already "stopped".

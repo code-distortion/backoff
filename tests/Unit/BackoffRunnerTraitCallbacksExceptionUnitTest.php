@@ -8,6 +8,8 @@ use CodeDistortion\Backoff\AttemptLog;
 use CodeDistortion\Backoff\Backoff;
 use CodeDistortion\Backoff\Tests\PHPUnitTestCase;
 use CodeDistortion\Backoff\Tests\Unit\Support\InvokableClass;
+use CodeDistortion\Backoff\Tests\Unit\Support\OtherExcptn1;
+use CodeDistortion\Backoff\Tests\Unit\Support\OtherExcptn2;
 use Exception;
 use PHPUnit\Framework\Attributes\Test;
 use Throwable;
@@ -20,7 +22,7 @@ use Throwable;
 class BackoffRunnerTraitCallbacksExceptionUnitTest extends PHPUnitTestCase
 {
     /**
-     * Test that different combinations of exceptionCallbacks are called.
+     * Test that different combinations of exception callbacks are called successfully.
      *
      * @test
      *
@@ -31,68 +33,72 @@ class BackoffRunnerTraitCallbacksExceptionUnitTest extends PHPUnitTestCase
     {
         $maxAttempts = 5;
         $newBackoff = fn() => Backoff::noop()->maxAttempts($maxAttempts)->retryExceptions();
-
-        $exception = new Exception();
-        $createCallback = fn(&$count)
-            => function (Throwable $e, AttemptLog $log, bool $willRetry) use (&$count) {
-                $count++;
-            };
+        $throwException = new Exception();
+        $createCallback = fn(&$count) => function () use (&$count) {
+            $count++;
+        };
 
 
 
+        // callback1
         $count1 = 0;
         $newBackoff()
             ->exceptionCallback($createCallback($count1))
-            ->attempt(fn() => throw $exception, null);
+            ->attempt(fn() => throw $throwException, null);
         self::assertSame($maxAttempts, $count1);
 
+        // callback1, callback2
         $count1 = $count2 = 0;
         $newBackoff()
             ->exceptionCallback($createCallback($count1), $createCallback($count2))
-            ->attempt(fn() => throw $exception, null);
+            ->attempt(fn() => throw $throwException, null);
         self::assertSame($maxAttempts, $count1);
         self::assertSame($maxAttempts, $count2);
 
-
+        // callback1, [callback2, callback3]
         $count1 = $count2 = $count3 = 0;
         $newBackoff()
             ->exceptionCallback($createCallback($count1), [$createCallback($count2), $createCallback($count3)])
-            ->attempt(fn() => throw $exception, null);
+            ->attempt(fn() => throw $throwException, null);
         self::assertSame($maxAttempts, $count1);
         self::assertSame($maxAttempts, $count2);
         self::assertSame($maxAttempts, $count3);
 
-
+        // callback1
+        // [callback2, callback3, callback4]
         $count1 = $count2 = $count3 = $count4 = 0;
         $newBackoff()
             ->exceptionCallback($createCallback($count1))
             ->exceptionCallback([$createCallback($count2), $createCallback($count3), $createCallback($count4)])
-            ->attempt(fn() => throw $exception, null);
+            ->attempt(fn() => throw $throwException, null);
         self::assertSame($maxAttempts, $count1);
         self::assertSame($maxAttempts, $count2);
         self::assertSame($maxAttempts, $count3);
         self::assertSame($maxAttempts, $count4);
 
-
+        // callback1
+        // callback2
+        // callback3
         $count1 = $count2 = $count3 = 0;
         $newBackoff()
             ->exceptionCallback($createCallback($count1))
             ->exceptionCallback($createCallback($count2))
             ->exceptionCallback($createCallback($count3))
-            ->attempt(fn() => throw $exception, null);
+            ->attempt(fn() => throw $throwException, null);
         self::assertSame($maxAttempts, $count1);
         self::assertSame($maxAttempts, $count2);
         self::assertSame($maxAttempts, $count3);
 
 
-        // a callable array
+
+        // a callable array. i.e. [class, method]
         $invokableClass = new InvokableClass();
         $callable = [$invokableClass, '__invoke'];
 
         $count1 = $count2 = 0;
         $newBackoff()
             ->exceptionCallback($callable)
-            ->attempt(fn() => throw $exception, null);
+            ->attempt(fn() => throw $throwException, null);
         self::assertSame($maxAttempts, $invokableClass->getCount());
     }
 
@@ -108,85 +114,166 @@ class BackoffRunnerTraitCallbacksExceptionUnitTest extends PHPUnitTestCase
     {
         $newBackoff = fn() => Backoff::noop()->maxAttempts(2)->retryExceptions();
 
-        $exception = new Exception();
+        $throwException = new OtherExcptn1();
         $createCallback = fn(&$count)
-            => function (Throwable $e, AttemptLog $log, bool $willRetry) use (&$count, $exception) {
+            => function (
+                $e,
+                $exception,
+                Throwable $blah,
+                OtherExcptn1 $otherExcptn1,
+                ?OtherExcptn2 $otherExcptn2,
+            ) use (
+                &$count,
+                $throwException,
+            ) {
                 $count++;
-                self::assertSame($exception, $e); // <<<
+                self::assertSame($throwException, $e);
+                self::assertSame($throwException, $exception);
+                self::assertSame($throwException, $blah);
+                self::assertSame($throwException, $otherExcptn1);
+                self::assertNull($otherExcptn2);
             };
 
         $count = 0;
         $newBackoff()
             ->exceptionCallback($createCallback($count))
-            ->attempt(fn() => throw $exception, null);
+            ->attempt(fn() => throw $throwException, null);
         self::assertGreaterThan(0, $count); // just confirm that it happened
     }
 
     /**
-     * Test that $willRetry that's passed to exception callbacks is passed correctly.
+     * Test the parameters that can be passed to exception callbacks.
      *
      * @test
      *
      * @return void
      */
     #[Test]
-    public static function test_will_retry_is_passed_to_exception_callbacks_correctly(): void
+    public static function test_parameters_passed_to_exception_callbacks(): void
     {
-        $maxAttempts = mt_rand(0, 10);
+        $maxAttempts = mt_rand(1, 10);
         $newNoopBackoff = fn() => Backoff::noop()->maxAttempts($maxAttempts)->retryExceptions();
         $newSequenceBackoff = fn() => Backoff::sequenceUs([1, 2, 3])->retryExceptions();
 
-        $exception = new Exception();
-        $createCallback = fn(&$count, $expectedWillRetry, $actualMaxAttempts)
-            => function (
-                Throwable $e,
-                AttemptLog $log,
-                bool $willRetry
+        $throwException = new Exception();
+        $createCallback = function (
+            &$count,
+            $expectedWillRetry,
+            $maxAttempts,
+            $actualMaxAttempts,
+            &$passedLogs
+        ) use ($throwException) {
+            return function (
+                $e,
+                $exception,
+                Throwable $blah,
+                bool $willRetry,
+                AttemptLog $attemptLog,
+                $log,
+                $logs,
             ) use (
                 &$count,
+                $maxAttempts,
                 $expectedWillRetry,
                 $actualMaxAttempts,
+                $throwException,
+                &$passedLogs,
             ) {
-                // use $expectedWillRetry, until the last attempt
+                // check the exception was passed correctly
+                self::assertSame($throwException, $e);
+                self::assertSame($throwException, $exception);
+                self::assertSame($throwException, $blah);
+
+                // check that $willRetry was passed correctly
                 $count++;
-                $expectedWillRetry = ($count < $actualMaxAttempts)
+                $expectedWillRetry = ($count < $actualMaxAttempts) // use $expectedWillRetry, until the last attempt
                     ? $expectedWillRetry
                     : false;
-
                 self::assertSame($expectedWillRetry, $willRetry); // <<<
+
+                // check that current AttemptLogs was passed correctly
+                self::assertInstanceOf(AttemptLog::class, $attemptLog);
+                self::assertSame($attemptLog, $log);
+                self::assertSame($count, $attemptLog->attemptNumber());
+                self::assertSame($maxAttempts, $attemptLog->maxAttempts());
+
+                // check that $logs was passed correctly
+                self::assertIsArray($logs);
+                self::assertCount($count, $logs);
+                foreach ($logs as $log2) {
+                    self::assertInstanceOf(AttemptLog::class, $log2);
+                    self::assertSame($maxAttempts, $log2->maxAttempts());
+                }
+
+                $passedLogs = $logs;
             };
+        };
 
         // noop - WILL retry exceptions
         $count1 = 0;
-        $newNoopBackoff()
-            ->exceptionCallback($createCallback($count1, true, $maxAttempts))
-            ->attempt(fn() => throw $exception, null);
+        $passedLogs = null;
+        $backoff = $newNoopBackoff()
+            ->exceptionCallback($createCallback($count1, true, $maxAttempts, $maxAttempts, $passedLogs));
+        $backoff->attempt(fn() => throw $throwException, null);
+        self::assertSame($backoff->logs(), $passedLogs);
 
         // noop - will NOT retry exceptions
         $count1 = 0;
-        $newNoopBackoff()
+        $passedLogs = null;
+        $backoff = $newNoopBackoff()
             ->dontRetryExceptions()
-            ->exceptionCallback($createCallback($count1, false, 1))
-            ->attempt(fn() => throw $exception, null);
+            ->exceptionCallback($createCallback($count1, false, $maxAttempts, 1, $passedLogs));
+        $backoff->attempt(fn() => throw $throwException, null);
+        self::assertSame($backoff->logs(), $passedLogs);
 
         // sequence (which has 3 retries) - WILL retry exceptions
         $count1 = 0;
-        $newSequenceBackoff()
+        $passedLogs = null;
+        $backoff = $newSequenceBackoff()
             ->maxAttempts(6) // more than the number of delays in the sequence
-            ->exceptionCallback($createCallback($count1, true, 4))
-            ->attempt(fn() => throw $exception, null);
+            ->exceptionCallback($createCallback($count1, true, 6, 4, $passedLogs));
+        $backoff->attempt(fn() => throw $throwException, null);
+        self::assertSame($backoff->logs(), $passedLogs);
 
         // sequence (which has 3 retries) - will NOT retry exceptions
         $count1 = 0;
-        $newSequenceBackoff()
+        $passedLogs = null;
+        $backoff = $newSequenceBackoff()
             ->dontRetryExceptions()
             ->maxAttempts(6) // more than the number of delays in the sequence
-            ->exceptionCallback($createCallback($count1, false, 1))
-            ->attempt(fn() => throw $exception, null);
+            ->exceptionCallback($createCallback($count1, false, 6, 1, $passedLogs));
+        $backoff->attempt(fn() => throw $throwException, null);
+        self::assertSame($backoff->logs(), $passedLogs);
     }
 
     /**
-     * Test that when an exception callback itself throws an exception, that this exception is rethrown.
+     * Test that exception callbacks aren't called when they have arguments that don't match.
+     *
+     * @test
+     *
+     * @return void
+     */
+    #[Test]
+    public static function test_that_exception_callbacks_arent_called_when_their_arguments_dont_match(): void
+    {
+        $count1 = 0;
+        $callback1 = function ($log) use (&$count1) {
+            $count1++;
+        };
+        $count2 = 0;
+        $callback2 = function ($log, int $int) use (&$count2) {
+            $count2++;
+        };
+
+        Backoff::noop()->maxAttempts(1)
+            ->exceptionCallback($callback1, $callback2)
+            ->attempt(fn() => throw new Exception(), null);
+        self::assertSame(1, $count1);
+        self::assertSame(0, $count2);
+    }
+
+    /**
+     * Test that exceptions thrown by exception-callbacks are thrown.
      *
      * @test
      *
@@ -195,25 +282,25 @@ class BackoffRunnerTraitCallbacksExceptionUnitTest extends PHPUnitTestCase
     #[Test]
     public static function test_that_exception_callback_exceptions_are_rethrown(): void
     {
+        $exception = new Exception();
         $count = 0;
-        $randInt = mt_rand();
-        $callback = function () use (&$count, $randInt) {
+        $callback = function () use (&$count, $exception) {
             $count++;
-            throw new Exception("thrown from here $randInt");
+            throw $exception;
         };
 
         $e = null;
         try {
             Backoff::noop()
                 ->maxAttempts(5)
-                ->exceptionCallback($callback)
                 ->retryExceptions()
+                ->exceptionCallback($callback)
                 ->attempt(fn() => throw new Exception(), null);
         } catch (Throwable $e) {
         }
 
         self::assertInstanceOf(Exception::class, $e);
-        self::assertSame("thrown from here $randInt", $e->getMessage());
+        self::assertSame($exception, $e);
         self::assertSame(1, $count);
     }
 }

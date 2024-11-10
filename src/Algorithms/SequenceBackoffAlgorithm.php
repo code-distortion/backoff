@@ -37,7 +37,7 @@ class SequenceBackoffAlgorithm extends BaseBackoffAlgorithm implements BackoffAl
         // so that it's easier for calculateBaseDelay to work with it
         $delays = array_values($delays);
 
-        // if null is present in the array, remove it and all following delays
+        // if null is present in the array, remove it and all delays thereafter
         $index = array_search(null, $delays, true);
         if (is_int($index)) {
             array_splice($delays, $index);
@@ -69,10 +69,7 @@ class SequenceBackoffAlgorithm extends BaseBackoffAlgorithm implements BackoffAl
 
         // repeat the last delay
         if (($this->repeat) && ((bool) count($this->delays))) {
-            $last = end($this->delays);
-            return $last !== false
-                ? $last
-                : null;
+            return end($this->delays);
         }
 
         return null;

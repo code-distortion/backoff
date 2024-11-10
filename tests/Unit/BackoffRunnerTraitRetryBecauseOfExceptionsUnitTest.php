@@ -700,7 +700,10 @@ class BackoffRunnerTraitRetryBecauseOfExceptionsUnitTest extends PHPUnitTestCase
                                     $expectedToRetry = true;
                                     // allow the an-exception default to be included, it takes priority
                                     $expectedReturn = $caughtAnException
-                                        ? ($currentAnExceptionDefault ?? $currentAllExceptionsDefault ?? $currentAttemptDefault)
+                                        ? ($currentAnExceptionDefault
+                                            ?? $currentAllExceptionsDefault
+                                            ?? $currentAttemptDefault
+                                        )
                                         : ($currentAllExceptionsDefault ?? $currentAttemptDefault);
                                 } elseif ($callRetryAllExceptions === false) {
                                     $expectedToRetry = false;
@@ -728,7 +731,10 @@ class BackoffRunnerTraitRetryBecauseOfExceptionsUnitTest extends PHPUnitTestCase
                                         $expectedToRetry = true;
                                         // allow the all-exceptions default to be included
                                         $expectedReturn = ($callRetryAllExceptions === true)
-                                            ? ($currentAnExceptionDefault ?? $currentAllExceptionsDefault ??$currentAttemptDefault)
+                                            ? ($currentAnExceptionDefault
+                                                ?? $currentAllExceptionsDefault
+                                                ?? $currentAttemptDefault
+                                            )
                                             : ($currentAnExceptionDefault ?? $currentAttemptDefault);
                                     }
                                 }

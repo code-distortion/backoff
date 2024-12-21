@@ -498,7 +498,7 @@ trait BackoffRunnerTrait
                     return $possibleMatch;
                 }
 
-                if ((!$possibleMatch->strict) && ($result == $possibleMatch->value)) {
+                if ((!$possibleMatch->strict) && ($result === $possibleMatch->value)) {
                     return $possibleMatch;
                 }
             }
@@ -520,7 +520,7 @@ trait BackoffRunnerTrait
         }
 
         // when not initialised by the caller, catch -any- exception, with no default (default behaviour)
-        if (count($this->retryExceptions) == 0) {
+        if (count($this->retryExceptions) === 0) {
             return new PossibleMatch(true);
         }
 

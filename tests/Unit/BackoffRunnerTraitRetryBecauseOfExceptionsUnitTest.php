@@ -118,7 +118,7 @@ class BackoffRunnerTraitRetryBecauseOfExceptionsUnitTest extends PHPUnitTestCase
     public static function backoffRetryExceptionsDataProvider(): array
     {
         $randInt = mt_rand();
-        $throwUntilAttempt = function ($throwUntil, $return, $throw) {
+        $throwUntilAttempt = function (int $throwUntil, mixed $return, Throwable $throw) {
             return function () use (&$throwUntil, $return, $throw): mixed {
                 return --$throwUntil <= 0
                     ? $return
@@ -683,7 +683,7 @@ class BackoffRunnerTraitRetryBecauseOfExceptionsUnitTest extends PHPUnitTestCase
 
                                 // when catching a particular exception (BEFORE possibly calling retryAllExceptions())
                                 $caughtAnException = false;
-                                if ($callRetryExceptionsWhen == 1) {
+                                if ($callRetryExceptionsWhen === 1) {
                                     if ($exceptionToThrow === $otherException1) {
                                         $expectedToRetry = true;
                                         $caughtAnException = true;
@@ -712,7 +712,7 @@ class BackoffRunnerTraitRetryBecauseOfExceptionsUnitTest extends PHPUnitTestCase
                                 }
 
                                 // when catching a particular exception (AFTER possibly calling retryAllExceptions())
-                                if ($callRetryExceptionsWhen == 2) {
+                                if ($callRetryExceptionsWhen === 2) {
 
                                     // if neither ->retryAllExceptions() or ->dontRetryExceptions() were called
                                     // the default action (of retrying all exceptions) is ignored now that
@@ -747,9 +747,9 @@ class BackoffRunnerTraitRetryBecauseOfExceptionsUnitTest extends PHPUnitTestCase
                                     : null;
 
                                 $return[] = [
-                                    'callRetryExceptionsFirst' => $callRetryExceptionsWhen == 1,
+                                    'callRetryExceptionsFirst' => $callRetryExceptionsWhen === 1,
                                     'callRetryAllExceptions' => $callRetryAllExceptions,
-                                    'callRetryExceptionsSecond' => $callRetryExceptionsWhen == 2,
+                                    'callRetryExceptionsSecond' => $callRetryExceptionsWhen === 2,
                                     'attemptDefault' => $currentAttemptDefault,
                                     'allExceptionsDefault' => $currentAllExceptionsDefault,
                                     'anExceptionDefault' => $currentAnExceptionDefault,
@@ -780,7 +780,7 @@ class BackoffRunnerTraitRetryBecauseOfExceptionsUnitTest extends PHPUnitTestCase
     {
         $newBackoff = fn() => Backoff::noop()->maxAttempts(5)->retryExceptions();
 
-        $createCallback = fn(&$count) => function (Throwable $e, AttemptLog $log, bool $willRetry) use (&$count) {
+        $createCallback = fn(int &$count) => function (Throwable $e, AttemptLog $log, bool $willRetry) use (&$count) {
             $count++;
         };
 

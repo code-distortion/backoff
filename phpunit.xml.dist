@@ -30,7 +30,7 @@
   processIsolation="false"
   requireCoverageMetadata="false"
   stopOnDefect="true"
-  stopOnDeprecation="false"
+  stopOnDeprecation="true"
   stopOnError="true"
   stopOnFailure="true"
   stopOnIncomplete="false"
@@ -41,17 +41,17 @@
 >
   <testsuites>
     <testsuite name="Unit">
-      <directory suffix="Test.php">./tests/Unit</directory>
+      <directory suffix="Test.php">./tests/Unit/</directory>
     </testsuite>
   </testsuites>
   <coverage>
     <report>
-      <html outputDirectory="phpunit/coverage"/>
+      <html outputDirectory="phpunit/coverage/"/>
     </report>
   </coverage>
   <source>
     <include>
-      <directory suffix=".php">./src</directory>
+      <directory suffix=".php">./src/</directory>
     </include>
   </source>
 </phpunit>

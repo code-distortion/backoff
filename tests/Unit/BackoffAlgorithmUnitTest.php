@@ -53,7 +53,7 @@ class BackoffAlgorithmUnitTest extends PHPUnitTestCase
     /**
      * DataProvider for test_normalisation_of_time_inputs.
      *
-     * @return array<array<callable|array<integer|float|false>>>
+     * @return array<array<callable|array<integer|float|null>>>
      */
     public static function backoffAlgorithmDataProvider(): array
     {

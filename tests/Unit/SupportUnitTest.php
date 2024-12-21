@@ -55,12 +55,12 @@ class SupportUnitTest extends PHPUnitTestCase
     public static function test_random_float_dec_pl(): void
     {
         // check the default number of decimal places
-        $detectedDecPl = self::howManyDecimalPlacesAreUsed(fn() => Support::randFloat(0, 1));
+        $detectedDecPl = self::howManyDecimalPlacesAreUsed(fn() => (float) Support::randFloat(0, 1));
         self::assertSame(10, $detectedDecPl);
 
         for ($decPl = 0; $decPl <= 10; $decPl++) {
             // check the default number of decimal places
-            $detectedDecPl = self::howManyDecimalPlacesAreUsed(fn() => Support::randFloat(0, 1, $decPl));
+            $detectedDecPl = self::howManyDecimalPlacesAreUsed(fn() => (float) Support::randFloat(0, 1, $decPl));
             self::assertSame($decPl, $detectedDecPl);
         }
     }
@@ -81,7 +81,7 @@ class SupportUnitTest extends PHPUnitTestCase
     /**
      * Generate lots of random floats and check how many decimal places they have.
      *
-     * @param callable $callback A callback that calls Support::randFloat to generate a random number.
+     * @param callable():float $callback A callback that calls Support::randFloat to generate a random number.
      * @return integer
      */
     public static function howManyDecimalPlacesAreUsed(callable $callback): int
@@ -154,12 +154,12 @@ class SupportUnitTest extends PHPUnitTestCase
             foreach (Settings::ALL_UNIT_TYPES as $currentUnitType) {
 
                 // disregard timespans that are too small to matter
-                if ($currentUnitType == Settings::UNIT_MICROSECONDS) {
+                if ($currentUnitType === Settings::UNIT_MICROSECONDS) {
                     if (in_array($timespan, [0.000_001, 0.001], true)) {
                         continue;
                     }
                 }
-                if ($currentUnitType == Settings::UNIT_MILLISECONDS) {
+                if ($currentUnitType === Settings::UNIT_MILLISECONDS) {
                     if (in_array($timespan, [0.000_001], true)) {
                         continue;
                     }

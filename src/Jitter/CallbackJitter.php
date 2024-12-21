@@ -40,6 +40,10 @@ class CallbackJitter extends BaseJitter implements JitterInterface
     public function apply(int|float $delay, int $retryNumber): int|float
     {
         $callback = $this->callback;
-        return $callback($delay, $retryNumber);
+        $return = $callback($delay, $retryNumber);
+        if (is_int($return) || is_float($return)) {
+            return $return;
+        }
+        return 1;
     }
 }

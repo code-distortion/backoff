@@ -57,10 +57,6 @@ abstract class Support
             return null;
         }
 
-        if ($desiredUnitType == $currentUnitType) {
-            return $delay;
-        }
-
         return match ($desiredUnitType) {
 
             Settings::UNIT_MICROSECONDS => match ($currentUnitType) {
@@ -75,11 +71,13 @@ abstract class Support
                 default => $delay * 1_000,
             },
 
-            default => match ($currentUnitType) { // seconds
+            Settings::UNIT_SECONDS => match ($currentUnitType) { // seconds
                 Settings::UNIT_MICROSECONDS => $delay / 1_000_000,
                 Settings::UNIT_MILLISECONDS => $delay / 1_000,
                 default => $delay,
             },
+
+            default => null,
         };
     }
 

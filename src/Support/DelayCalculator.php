@@ -168,7 +168,7 @@ class DelayCalculator
         $prevBaseDelay = $this->getBaseDelay($retryNumber - 1);
 
         if ($this->immediateFirstRetry) {
-            if ($retryNumber == 1) {
+            if ($retryNumber === 1) {
                 return 0;
             }
             $retryNumber--;

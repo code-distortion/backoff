@@ -34,7 +34,7 @@ class BackoffRunnerTraitCallbacksExceptionUnitTest extends PHPUnitTestCase
         $maxAttempts = 5;
         $newBackoff = fn() => Backoff::noop()->maxAttempts($maxAttempts)->retryExceptions();
         $throwException = new Exception();
-        $createCallback = fn(&$count) => function () use (&$count) {
+        $createCallback = fn(int &$count) => function () use (&$count) {
             $count++;
         };
 
@@ -115,7 +115,7 @@ class BackoffRunnerTraitCallbacksExceptionUnitTest extends PHPUnitTestCase
         $newBackoff = fn() => Backoff::noop()->maxAttempts(2)->retryExceptions();
 
         $throwException = new OtherExcptn1();
-        $createCallback = fn(&$count)
+        $createCallback = fn(int &$count)
             => function (
                 $e,
                 $exception,
@@ -157,11 +157,11 @@ class BackoffRunnerTraitCallbacksExceptionUnitTest extends PHPUnitTestCase
 
         $throwException = new Exception();
         $createCallback = function (
-            &$count,
-            $expectedWillRetry,
-            $maxAttempts,
-            $actualMaxAttempts,
-            &$passedLogs
+            int &$count,
+            bool $expectedWillRetry,
+            int $maxAttempts,
+            int $actualMaxAttempts,
+            ?array &$passedLogs
         ) use ($throwException) {
             return function (
                 $e,

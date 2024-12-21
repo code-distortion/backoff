@@ -31,7 +31,7 @@ class BackoffRunnerTraitCallbacksInvalidResultUnitTest extends PHPUnitTestCase
     {
         $maxAttempts = 2;
         $newBackoff = fn() => Backoff::noop()->maxAttempts($maxAttempts);
-        $createCallback = fn(&$count) => function () use (&$count) {
+        $createCallback = fn(int &$count) => function () use (&$count) {
             $count++;
         };
 
@@ -138,12 +138,12 @@ class BackoffRunnerTraitCallbacksInvalidResultUnitTest extends PHPUnitTestCase
         $intendedResult = mt_rand(0, 10);
 
         $createCallback = function (
-            &$count,
-            $expectedWillRetry,
-            $maxAttempts,
-            $actualMaxAttempts,
-            $intendedResult,
-            &$passedLogs,
+            int &$count,
+            bool $expectedWillRetry,
+            int $maxAttempts,
+            int $actualMaxAttempts,
+            int $intendedResult,
+            ?array &$passedLogs,
         ) {
             return function (
                 $result,

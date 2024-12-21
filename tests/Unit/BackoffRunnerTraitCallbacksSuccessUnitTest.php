@@ -32,7 +32,7 @@ class BackoffRunnerTraitCallbacksSuccessUnitTest extends PHPUnitTestCase
         $maxAttempts = 5;
         $newBackoff = fn() => Backoff::noop()->maxAttempts($maxAttempts);
 
-        $createCallback = fn(&$count) => function () use (&$count) {
+        $createCallback = fn(int &$count) => function () use (&$count) {
             $count++;
         };
 
@@ -110,7 +110,7 @@ class BackoffRunnerTraitCallbacksSuccessUnitTest extends PHPUnitTestCase
     #[Test]
     public static function test_that_success_callbacks_are_called_only_once_when_expected(): void
     {
-        $createCallback = fn(&$count) => function () use (&$count) {
+        $createCallback = fn(int &$count) => function () use (&$count) {
             $count++;
         };
 
@@ -163,9 +163,9 @@ class BackoffRunnerTraitCallbacksSuccessUnitTest extends PHPUnitTestCase
         };
 
         $createCallback = function (
-            $succeedAfter,
-            $intendedResult,
-            &$passedLogs,
+            int $succeedAfter,
+            int $intendedResult,
+            ?array &$passedLogs,
         ) {
             return function (
                 $result,

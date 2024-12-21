@@ -22,17 +22,13 @@ class SequenceBackoffAlgorithm extends BaseBackoffAlgorithm implements BackoffAl
     /**
      * Constructor
      *
-     * @param array<integer|float> $delays The sequence of delays to use.
-     * @param boolean              $repeat Repeat the last delay indefinitely if more retries are needed.
+     * @param array<integer|float|null> $delays The sequence of delays to use.
+     * @param boolean                   $repeat Repeat the last delay indefinitely if more retries are needed.
      */
     public function __construct(
         private array $delays,
         private bool $repeat = false,
     ) {
-        // even though the array is typed above as array<integer|float>
-        // allow for it to have nulls (for static analysis), then check for and remove them
-        /** @var array<integer|float|null> $delays */
-
         // ensure the array is indexed from 0
         // so that it's easier for calculateBaseDelay to work with it
         $delays = array_values($delays);

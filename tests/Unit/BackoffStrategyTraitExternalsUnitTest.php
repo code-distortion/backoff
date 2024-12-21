@@ -788,10 +788,9 @@ class BackoffStrategyTraitExternalsUnitTest extends PHPUnitTestCase
 
         if ($expectSleep) {
             // check that it matches within 10%
+            // note: this timing varies greatly on Windows
             self::assertGreaterThan($seconds / $margin, $diff);
             self::assertLessThan($seconds * $margin, $diff);
-
-            // todo - this timing varies greatly on Windows, this needs to be checked and possibly re-thought
         } else {
             // check that it didn't sleep
             self::assertLessThan(0.001, $diff);
@@ -846,10 +845,9 @@ class BackoffStrategyTraitExternalsUnitTest extends PHPUnitTestCase
         $diff = microtime(true) - $start;
 
         // check that it matches within 10%
+        // note: this timing varies greatly on Windows
         self::assertGreaterThan($seconds / $margin, $diff);
         self::assertLessThan($seconds * $margin, $diff);
-
-        // todo - this timing varies greatly on Windows, this needs to be checked and possibly re-thought
     }
 
     /**
@@ -1020,7 +1018,7 @@ class BackoffStrategyTraitExternalsUnitTest extends PHPUnitTestCase
         );
         $count = 0;
         while ($strategy->step()) {
-            self::assertSame(++$count == 1, $strategy->isFirstAttempt());
+            self::assertSame(++$count === 1, $strategy->isFirstAttempt());
         }
 
         // when running $strategy->step() at the end of the loop
@@ -1034,7 +1032,7 @@ class BackoffStrategyTraitExternalsUnitTest extends PHPUnitTestCase
         );
         $count = 0;
         do {
-            self::assertSame(++$count == 1, $strategy->isFirstAttempt());
+            self::assertSame(++$count === 1, $strategy->isFirstAttempt());
         } while ($strategy->step());
     }
 
@@ -1061,7 +1059,7 @@ class BackoffStrategyTraitExternalsUnitTest extends PHPUnitTestCase
         );
         $count = 0;
         while ($strategy->step()) {
-            self::assertSame(++$count == 5, $strategy->isLastAttempt());
+            self::assertSame(++$count === 5, $strategy->isLastAttempt());
         }
 
         // test when stopped = true
@@ -1080,7 +1078,7 @@ class BackoffStrategyTraitExternalsUnitTest extends PHPUnitTestCase
         );
         $count = 0;
         do {
-            self::assertSame(++$count == 5, $strategy->isLastAttempt());
+            self::assertSame(++$count === 5, $strategy->isLastAttempt());
         } while ($strategy->step());
 
 
@@ -1132,7 +1130,7 @@ class BackoffStrategyTraitExternalsUnitTest extends PHPUnitTestCase
         );
         $count = 0;
         while ($strategy->step()) {
-            self::assertSame(++$count == 3, $strategy->isLastAttempt());
+            self::assertSame(++$count === 3, $strategy->isLastAttempt());
         }
 
 
@@ -1148,7 +1146,7 @@ class BackoffStrategyTraitExternalsUnitTest extends PHPUnitTestCase
         );
         $count = 0;
         do {
-            self::assertSame(++$count == 3, $strategy->isLastAttempt());
+            self::assertSame(++$count === 3, $strategy->isLastAttempt());
         } while ($strategy->step());
     }
 

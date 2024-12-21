@@ -21,13 +21,16 @@ jobs:
       fail-fast: false
       matrix:
         os: [ "ubuntu-latest", "macos-latest", "windows-latest" ]
-        php: [ "8.3", "8.2", "8.1", "8.0" ]
+        php: [ "8.4", "8.3", "8.2", "8.1", "8.0" ]
         dependency-prefer: [ "prefer-stable", "prefer-lowest" ]
         include:
           # remember, either:
           # - don't include values above when there's only one option. hard-code it or put it below in the include section
           # - add only new values that aren't present above (e.g. os-title and dependency-prefer-title are new values, not updating an existing value)
           # - or repeat all values from above each time
+          - php: "8.4"
+            phpunit: "^11.0"
+            phpunit-config-file: "phpunit.github-actions.xml.dist"
           - php: "8.3"
             phpunit: "^11.0"
             phpunit-config-file: "phpunit.github-actions.xml.dist"

@@ -98,7 +98,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
     /**
      * DataProvider for test_that_backoff_rethrows_the_last_exception.
      *
-     * @return array<string,array<string,boolean|int|float|string|array<integer>|stdClass|callable>>
+     * @return array<string,array<string,boolean|integer|float|string|array<integer>|stdClass|callable|\Closure|BackoffException|null>>
      * @throws Exception Doesn't actually throw this, however phpcs expects it.
      */
     public static function backoffRethrowDataProvider(): array
@@ -732,7 +732,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
             $count++;
         }
         $ranOk = ($count >= 4);
-        $runsAtStartOfLoop = ($count == 5);
+        $runsAtStartOfLoop = ($count === 5);
 
         self::assertTrue($ranOk);
         self::assertTrue($runsAtStartOfLoop);
@@ -749,7 +749,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
             $count++;
         }
         $ranOk = ($count >= 4);
-        $runsAtStartOfLoop = ($count == 5);
+        $runsAtStartOfLoop = ($count === 5);
 
         self::assertTrue($ranOk);
         self::assertFalse($runsAtStartOfLoop); // runs after the first attempt this time
@@ -900,7 +900,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
             &$overallDelaySequence,
             &$overallWorkingTimeSequence,
             &$unitTypeSequence,
-        ) {
+        ): callable {
 
             return function (
                 mixed $exceptionOrResult,
@@ -916,7 +916,7 @@ class BackoffRunnerTraitUnitTest extends PHPUnitTestCase
                 &$overallWorkingTimeSequence,
                 &$unitTypeSequence,
                 $return,
-            ) {
+            ): bool|null {
                 // testing $l…
 
                 $attemptSequence[] = $l->attemptNumber();

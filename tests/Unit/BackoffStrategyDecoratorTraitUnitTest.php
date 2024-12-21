@@ -226,7 +226,7 @@ class BackoffStrategyDecoratorTraitUnitTest extends PHPUnitTestCase
     #[Test]
     public static function test_the_callback_alternative_constructors(): void
     {
-        $callback = fn($retryNumber) => $retryNumber <= 3
+        $callback = fn(int $retryNumber) => ($retryNumber <= 3)
             ? $retryNumber * 1000
             : null; // stop after 3 delays
         $expected = [1000, 2000, 3000];

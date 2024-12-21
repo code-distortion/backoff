@@ -329,7 +329,7 @@ trait BackoffStrategyTrait
         }
 
         $this->overallDelay ??= 0;
-        $this->overallDelay += $this->getDelay();
+        $this->overallDelay += $this->getDelay() ?? 0;
 
         $this->performSleep($start, $microsecondDelay);
 
@@ -436,12 +436,12 @@ trait BackoffStrategyTrait
 
 
         // record the DateTimes as close to when they'll be used as possible
-        if ($attemptNumber == 1) {
+        if ($attemptNumber === 1) {
             $this->firstAttemptOccurredAt = new DateTime();
             $this->attemptLogs[$attemptNumber]->setFirstAttemptOccurredAt($this->firstAttemptOccurredAt);
         }
 
-        $occurredAt = ($attemptNumber == 1) && !is_null($this->firstAttemptOccurredAt)
+        $occurredAt = ($attemptNumber === 1) && !is_null($this->firstAttemptOccurredAt)
             ? $this->firstAttemptOccurredAt
             : new DateTime();
         $this->attemptLogs[$attemptNumber]->setThisAttemptOccurredAt($occurredAt);
@@ -491,13 +491,13 @@ trait BackoffStrategyTrait
 
         // calculate and record the working time
         $diffInSeconds = Support::timeDiff($attemptLog->thisAttemptOccurredAt(), $finishedAt);
-        $diffInUnits = Support::convertTimespan($diffInSeconds, Settings::UNIT_SECONDS, $this->unitType);
+        $diffInUnits = Support::convertTimespan($diffInSeconds, Settings::UNIT_SECONDS, $this->unitType) ?? 0;
         $attemptLog->setWorkingTime($diffInUnits);
 
         // add this new working time, to the overall working time
         $prevAttemptLog = $this->attemptLogs[$attemptLog->attemptNumber() - 1] ?? null;
         if (!is_null($prevAttemptLog)) {
-            $diffInUnits += $prevAttemptLog->overallWorkingTime();
+            $diffInUnits += $prevAttemptLog->overallWorkingTime() ?? 0;
         }
         $attemptLog->setOverallWorkingTime($diffInUnits);
     }
@@ -622,7 +622,7 @@ trait BackoffStrategyTrait
      */
     public function isFirstAttempt(): bool
     {
-        return $this->currentAttemptNumber() == 1;
+        return $this->currentAttemptNumber() === 1;
     }
 
     /**

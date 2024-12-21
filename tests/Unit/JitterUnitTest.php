@@ -52,7 +52,7 @@ class JitterUnitTest extends PHPUnitTestCase
     public static function test_callback_jitter(): void
     {
         // test that delay is passed
-        $callback = fn($delay, $retryNumber) => $delay + 1;
+        $callback = fn(int|float $delay, int $retryNumber) => $delay + 1;
         $jitter = new CallbackJitter($callback);
 
         self::assertEquals(2, $jitter->apply(1, 10));
@@ -60,25 +60,32 @@ class JitterUnitTest extends PHPUnitTestCase
         self::assertEquals(4, $jitter->apply(3, 12));
 
         // test that retry-number is passed
-        $callback = fn($delay, $retryNumber) => $retryNumber + 1;
+        $callback = fn(int|float $delay, int $retryNumber) => $retryNumber + 1;
         $jitter = new CallbackJitter($callback);
         self::assertEquals(11, $jitter->apply(1, 10));
         self::assertEquals(12, $jitter->apply(2, 11));
         self::assertEquals(13, $jitter->apply(3, 12));
 
         // int return
-        $callback = fn($delay, $retryNumber) => $delay + 1;
+        $callback = fn(int|float $delay, int $retryNumber) => $delay + 1;
         $jitter = new CallbackJitter($callback);
         self::assertEquals(2, $jitter->apply(1, 10));
         self::assertEquals(3, $jitter->apply(2, 11));
         self::assertEquals(4, $jitter->apply(3, 12));
 
         // float return
-        $callback = fn($delay, $retryNumber) => $delay + 0.1;
+        $callback = fn(int|float $delay, int $retryNumber) => $delay + 0.1;
         $jitter = new CallbackJitter($callback);
         self::assertEquals(1.1, $jitter->apply(1.0, 10));
         self::assertEquals(2.1, $jitter->apply(2.0, 11));
         self::assertEquals(3.1, $jitter->apply(3.0, 12));
+
+        // return something other than int or float
+        $callback = fn(int|float $delay, int $retryNumber) => 'a string';
+        $jitter = new CallbackJitter($callback);
+        self::assertEquals(1, $jitter->apply(1.0, 10));
+        self::assertEquals(1, $jitter->apply(2.0, 11));
+        self::assertEquals(1, $jitter->apply(3.0, 12));
     }
 
 

@@ -420,7 +420,7 @@ class DelayCalculatorUnitTest extends PHPUnitTestCase
             true,
         );
         for ($count = 0; $count < 1000; $count++) {
-            $expected = $count == 0
+            $expected = ($count === 0)
                 ? null
                 : 0;
             self::assertSame($expected, $delayCalculator->getBaseDelay($count));
@@ -439,7 +439,7 @@ class DelayCalculatorUnitTest extends PHPUnitTestCase
         );
         for ($count = 0; $count < 1000; $count++) {
 
-            $expected = ($count == 0)
+            $expected = ($count === 0)
                 ? null
                 : 0;
             $expected = ($count <= $maxRetries)

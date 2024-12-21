@@ -1,4 +1,4 @@
-name: run-tests
+name: "run-tests"
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
     - cron: "0 0 * * 0"
 
 permissions:
-  contents: read
+  contents: "read"
 
 jobs:
 
@@ -18,16 +18,12 @@ jobs:
     name: "PHP${{ matrix.php }} ${{ matrix.os-title }} ${{ matrix.dependency-prefer-title }}"
     runs-on: "${{ matrix.os }}"
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         os: [ "ubuntu-latest", "macos-latest", "windows-latest" ]
         php: [ "8.4", "8.3", "8.2", "8.1", "8.0" ]
         dependency-prefer: [ "prefer-stable", "prefer-lowest" ]
         include:
-          # remember, either:
-          # - don't include values above when there's only one option. hard-code it or put it below in the include section
-          # - add only new values that aren't present above (e.g. os-title and dependency-prefer-title are new values, not updating an existing value)
-          # - or repeat all values from above each time
           - php: "8.4"
             phpunit: "^11.0"
             phpunit-config-file: "phpunit.github-actions.xml.dist"
@@ -60,9 +56,6 @@ jobs:
       - name: "Checkout code"
         uses: "actions/checkout@v4"
 
-#      - name: "Validate composer.json and composer.lock"
-#        run: "composer validate --strict"
-
       - name: "Setup PHP"
         uses: "shivammathur/setup-php@v2"
         with:
@@ -72,25 +65,28 @@ jobs:
         env:
           COMPOSER_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
 
+      - name: "Validate composer.json and composer.lock"
+        run: "composer validate --strict"
+
       # find composer's cache directory - so we know which directory to cache in the next step
       - name: "Find composer's cache directory"
         id: "composer-cache"
-        shell: bash # make sure this step works on Windows - see https://github.com/actions/runner/issues/2224#issuecomment-1289533957
+        shell: "bash" # make sure this step works on Windows - see https://github.com/actions/runner/issues/2224#issuecomment-1289533957
         run: |
           echo "composer_cache_dir=$(composer config cache-files-dir)">> "$GITHUB_OUTPUT"
 
       - name: "Cache composer's cache directory"
-        uses: "actions/cache@v3"
+        uses: "actions/cache@v4"
         with:
           path: "${{ steps.composer-cache.outputs.composer_cache_dir }}"
           key: "[${{ matrix.os }}][php-${{ matrix.php }}][${{ matrix.dependency-prefer }}][composer.json-${{ hashFiles('composer.json') }}]"
 
       - name: "Install dependencies"
-        uses: "nick-fields/retry@v2"
+        uses: "nick-fields/retry@v3"
         with:
           timeout_minutes: 5
           max_attempts: 5
-          shell: bash # make sure "^" characters are interpreted properly on Windows (e.g. in "^5.0")
+          shell: "bash" # make sure "^" characters are interpreted properly on Windows (e.g. in "^5.0")
           command: |
             composer remove "infection/infection" --dev --no-interaction --no-update
             composer remove "phpstan/phpstan" --dev --no-interaction --no-update

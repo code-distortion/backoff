@@ -7,6 +7,7 @@
 /.editorconfig                           export-ignore
 /.gitattributes                          export-ignore
 /.gitignore                              export-ignore
+/images                                  export-ignore
 /infection.json.dist                     export-ignore
 /phpcs.xml.dist                          export-ignore
 /phpstan.neon.dist                       export-ignore

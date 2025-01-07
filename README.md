@@ -6,6 +6,8 @@
 [![Buy The World a Tree](https://img.shields.io/badge/treeware-%F0%9F%8C%B3-lightgreen?style=flat-square)](https://plant.treeware.earth/code-distortion/backoff)
 [![Contributor Covenant](https://img.shields.io/badge/contributor%20covenant-v2.1%20adopted-ff69b4.svg?style=flat-square)](.github/CODE_OF_CONDUCT.md)
 
+![Sequence Backoff](docs/backoff-logo.png)
+
 ***code-distortion/backoff*** is a PHP library that retries your actions when they fail. It implements various backoff strategies and jitter to avoid overwhelming the resource being accessed.
 
 It's useful when you're working with services that might be temporarily unavailable, such as APIs.
@@ -17,7 +19,7 @@ $result = Backoff::exponential(2)->maxAttempts(10)->maxDelay(30)->attempt($actio
 ```
 
 > See the [cheatsheet](#cheatsheet) for an overview of what's possible.
-
+ 
 
 
 ## Table of Contents
@@ -361,6 +363,8 @@ A number of backoff algorithms have been included to choose from, and you can al
 
 ### Fixed Backoff
 
+![Fixed Backoff](docs/algorithms/fixed-backoff.png)
+
 The fixed backoff algorithm waits the *same* amount of time between each attempt.
 
 ```php
@@ -375,6 +379,8 @@ Backoff::fixedUs(2)->attempt($action); // in microseconds
 
 
 ### Linear Backoff
+
+![Linear Backoff](docs/algorithms/linear-backoff.png)
 
 The linear backoff algorithm increases the waiting period by a specific amount each time.
 
@@ -396,6 +402,8 @@ Backoff::linearUs(5)->attempt($action); // in microseconds
 
 ### Exponential Backoff
 
+![Exponential Backoff](docs/algorithms/exponential-backoff.png)
+
 The exponential backoff algorithm increases the waiting period exponentially.
 
 By default, the delay is doubled each time, but you can change the factor it multiplies by.
@@ -416,6 +424,8 @@ Backoff::exponentialUs(1)->attempt($action); // in microseconds
 
 ### Polynomial Backoff
 
+![Polynomial Backoff](docs/algorithms/polynomial-backoff.png)
+
 The polynomial backoff algorithm increases the waiting period in a polynomial manner.
 
 By default, the retry number is raised to the power of 2, but you can change this.
@@ -435,6 +445,8 @@ Backoff::polynomialUs(1)->attempt($action); // in microseconds
 
 
 ### Fibonacci Backoff
+
+![Fibonacci Backoff](docs/algorithms/fibonacci-backoff.png)
 
 The Fibonacci backoff algorithm increases waiting period by following a Fibonacci sequence. This is where each delay is the sum of the previous two delays.
 
@@ -461,6 +473,8 @@ Backoff::fibonacci(5, false)->attempt($action); // 5, 10, 15, 25, 40, 65, 105, 1
 
 ### Decorrelated Backoff
 
+![Decorrelated Backoff](docs/algorithms/decorrelated-backoff.png)
+
 The decorrelated backoff algorithm is a feedback loop where the previous delay is used as input to help to determine the next delay.
 
 A random delay between the `$baseDelay` and the `previous-delay * 3` is picked.
@@ -485,6 +499,8 @@ Backoff::decorrelatedUs(1)->attempt($action); // in microseconds
 
 ### Random Backoff
 
+![Random Backoff](docs/algorithms/random-backoff.png)
+
 The random backoff algorithm waits for a random period of time within the range you specify.
 
 Jitter is not applied to this algorithm.
@@ -503,6 +519,8 @@ Backoff::randomUs(2, 5)->attempt($action); // in microseconds
 
 
 ### Sequence Backoff
+
+![Sequence Backoff](docs/algorithms/sequence-backoff.png)
 
 The sequence backoff algorithm lets you specify the particular delays to use.
 
@@ -528,6 +546,8 @@ Backoff::sequenceUs([1, 1.25, 1.5, 2, 3])->attempt($action); // in microseconds
 
 ### Callback Backoff
 
+![Sequence Backoff](docs/algorithms/callback-backoff.png)
+
 The callback backoff algorithm lets you specify a callback that chooses the period to wait.
 
 Your callback is expected to return an `int` or `float` representing the delay, or `null` to indicate that the attempts should stop.
@@ -551,7 +571,9 @@ Backoff::callbackUs($callback)->attempt($action); // in microseconds
 
 
 
-### Custom Backoff Algorithm Class
+### Custom Backoff Algorithm Class 
+
+![Sequence Backoff](docs/algorithms/custom-backoff.png)
 
 As well as the [callback option above](#callback-backoff), you have the ability to create your own backoff algorithm *class* by extending `BaseBackoffAlgorithm` and implementing the `BackoffAlgorithmInterface`.
 
@@ -600,9 +622,11 @@ Backoff::customUs($algorithm)->attempt($action); // in microseconds
 
 ### Noop Backoff
 
+![Noop Backoff](docs/algorithms/noop-backoff.png)
+
 The "no-op" backoff algorithm is a utility algorithm that doesn't wait at all, retries are attempted straight away.
 
-This might be useful for testing purposes. See [Backoff and Test Suites](#working-with-test-suites) for more options when running tests.
+This might be useful for testing purposes. See [Working With Test Suites](#working-with-test-suites) for more options when running tests.
 
 ```php
 Backoff::noop()->attempt($action); // 0, 0, 0, 0, 0…
@@ -614,7 +638,7 @@ Backoff::noop()->attempt($action); // 0, 0, 0, 0, 0…
 
 The "no backoff" algorithm is a utility algorithm that doesn't allow retries at all. Only the first attempt will be made.
 
-This might be useful for testing purposes. See [Backoff and Test Suites](#working-with-test-suites) for more options when running tests.
+This might be useful for testing purposes. See [Working With Test Suites](#working-with-test-suites) for more options when running tests.
 
 ```php
 Backoff::none()->attempt($action); // (no retries)
@@ -640,7 +664,7 @@ Backoff::exponential(1)
 
 #### Max-Delay
 
-You can specify the maximum length each base-delay can be (which is the delay before [jitter](#jitter) is applied). This is useful for preventing the delays from becoming too long.
+You can specify the maximum length each *base-delay* can be (which is the delay before [jitter](#jitter) is applied). This will prevent the delays from becoming too large.
 
 > ***Note:*** You'll need to make sure the max-delay you specify matches the unit-of-measure being used.
 
@@ -673,15 +697,17 @@ Having a backoff algorithm is a good start but probably isn't enough to prevent 
 
 Jitter is used to mitigate this by making random adjustments to the Backoff Algorithm's delays.
 
-For example, if the backoff algorithm generates a delay of 100ms, jitter adjusts this to be somewhere between say, 75ms and 125ms. The actual range is determined by the type of jitter used.
+For example, if the backoff algorithm generates a delay of 100ms, jitter could randomly adjust this to be somewhere between say, 75ms and 125ms. The actual range depends on the type of jitter used.
 
-> This library applies [Full Jitter](#full-jitter) by default. You can use [No Jitter](#no-jitter) if you'd like to turn it off.
+This library applies [Full Jitter](#full-jitter) by default which is likely to be a good choice. You can turn jitter off altogether by using [No Jitter](#no-jitter).
 
 > The article [Exponential Backoff And Jitter](https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/) by Marc Brooker at AWS does a good job of explaining what jitter is, and the reason for its use.
 
 
 
 #### Full Jitter
+
+![Noop Backoff](docs/jitter/full-jitter.png)
 
 Full Jitter applies a random adjustment to the delay, within the range of 0 and the *full delay*. That is, between 0% and 100% of the base-delay.
 
@@ -699,6 +725,8 @@ Backoff::exponential(1)
 
 #### Equal Jitter
 
+![Noop Backoff](docs/jitter/equal-jitter.png)
+
 Equal Jitter applies a random adjustment to the delay, within the range of *half* and the *full delay*. That is, between 50% and 100% of the base-delay.
 
 `$delay = rand($delay / 2, $delay)`
@@ -713,19 +741,23 @@ Backoff::exponential(1)
 
 #### Custom Jitter Range
 
+![Noop Backoff](docs/jitter/custom-jitter.png)
+
 If you'd like a different range compared to *full* and *equal* jitter above, jitter-range lets you specify your own custom range.
 
 `$delay = rand($delay * $min, $delay  * $max)`
 
 ```php
 Backoff::exponential(1)
-    ->jitterRange(0.5, 1.5) // <<< between 50% and 150%
+    ->jitterRange(0.75, 1.25) // <<< between 75% and 125%
     ->attempt($action);
 ```
 
 
 
 #### Jitter Callback
+
+![Noop Backoff](docs/jitter/custom-jitter.png)
 
 Jitter callback lets you specify a callback that applies jitter to the base-delay.
 
@@ -746,6 +778,8 @@ Backoff::exponential(1)
 
 
 #### Custom Jitter Class
+
+![Noop Backoff](docs/jitter/custom-jitter.png)
 
 As well as customising jitter using the [range](#custom-jitter-range) and [callback](#jitter-callback) options above, you have the ability to create your own Jitter *class* by extending `BaseJitter` and implementing the `JitterInterface`.
 
@@ -1214,7 +1248,7 @@ This means that you won't be able to use Backoff's functionality to:
 
 If your aim is to do one of the following, you could use one of the already available options:
 
-> - [Catch and retry exceptions](#managing-exceptions) - If you'd like Backoff to catch *particular* exceptions, you can use [->retryExceptions(…)](#managing-exceptions). This lets you specify which exceptions to retry, or specify a callback to make the decision.
+> - [Catch and retry exceptions](#managing-exceptions) - If you'd like Backoff to catch *particular* exceptions, you can use [->retryExceptions(…)](#retry-when-particular-exceptions-occur). This lets you specify which exceptions to retry, or specify a callback to make the decision.
 > - [Retry based on return values](#managing-invalid-return-values) - If you'd like to selectively retry based on particular *return values*, you can use [->retryWhen(…)](#retry-when) or [->retryUntil(…)](#retry-until). These let you specify values to check for, or specify a callback to make the decision.
 > - [Trigger callbacks](#callbacks) - If you'd like to perform tasks in certain situations (like logging before each retry delay), you could consider using the callback options such as [->exceptionCallback(…)](#exception-callback) or [->invalidResultCallback(…)](#invalid-result-callback).
 

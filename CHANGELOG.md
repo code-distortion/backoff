@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 
 
+## [0.1.1] - 2025-08-03
+
+### Added
+- Bumped version of `code-distortion/di-caller` to `^0.3.0`
+
+
+
 ## [0.1.0] - 2025-01-08
 
 ### Added
